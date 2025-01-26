@@ -13,7 +13,8 @@ def compute_q_values(state_action_features, weights):
         scalar numpy Q-value
     """
     # Your code here
-    return 5 # replace this line
+    q_value = np.dot(state_action_features, weights)
+    return q_value
     # end your code
 
 def get_action_values(obs, feature_extractor, weights, num_actions):
@@ -52,11 +53,16 @@ class SemiGradientSARSA:
         self.w = np.full(num_state_action_features, initial_weight_value)
         self.discount = discount
         # Your code here: introduce any variables you may need
+        self.prev_state = None
+        self.prev_action = None
         # End your code here
 
     def update_q(self, obs, action, reward, next_obs, next_action, terminated):
         # Your code here
-        pass # replace this line
+        features_ = self.feature_extractor(obs, action)
+        features_next = self.feature_extractor(next_obs, next_action)
+        td_error = reward + self.discount * compute_q_values(features_next, self.w) * (1 - terminated) - compute_q_values(features_, self.w)
+        self.w += self.step_size * td_error * features_
         # End your code here
     
 
@@ -64,7 +70,10 @@ class SemiGradientSARSA:
         """Returns an integer 
         """
         # Your code here
-        action = None # replace this line
+        self.prev_state = obs
+        action_values = get_action_values(obs, self.feature_extractor, self.w, self.num_actions)
+        action = self.explorer.select_action(action_values)
+        self.prev_action = action
         # End your code here
         return action
         
@@ -75,10 +84,9 @@ class SemiGradientSARSA:
         Returns:
             None
         """
-        # Your code here
-        state = None # replace this line
-        action = None # replace this line
-        next_state = None # replace this line
-        next_action = None # replace this line
+        state = self.prev_state
+        action = self.prev_action
+        next_state = obs
+        next_action = self.act(obs)
         self.update_q(state, action, reward, next_state, next_action, terminated) # keep this line
         # End your code here

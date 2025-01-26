@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 from tile_coding import IHT, tiles
 
-CCID="machado"
+CCID="ddikshan"
 
 
 def plot_alg_results(episode_rewards_list, file, label="Algorithm"):

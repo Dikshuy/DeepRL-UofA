@@ -14,7 +14,9 @@ def compute_epsilon_greedy_action_probs(q_vals, epsilon):
 	"""
 	assert len(q_vals.shape) == 1
 	# start your code
-	pass # remove this line
+	action_probabilities = np.ones_like(q_vals) * epsilon / len(q_vals)
+	best_actions = np.where(q_vals == np.max(q_vals))[0]
+	action_probabilities[best_actions] += (1 - epsilon) / len(best_actions)
 	# end your code
 	assert action_probabilities.shape == q_vals.shape
 	return action_probabilities	
