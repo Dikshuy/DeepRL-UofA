@@ -9,7 +9,7 @@ from jumping_task.envs import JumpTaskEnv
 import feature_extraction
 import epsilon_greedy_explorers
 
-CCID="machado"
+CCID="ddikshan"
 
 
 def plot_alg_results(episode_returns_list, file, label="Algorithm", ylabel="Return"):
@@ -103,7 +103,7 @@ if __name__ == '__main__':
 
     explorer = epsilon_greedy_explorers.ConstantEpsilonGreedyExploration(1.0, num_actions)
 
-    feature_extractor = feature_extraction.terrible_feature_extractor
+    feature_extractor = feature_extraction.good_features
     num_features = 625 * num_actions
     sarsa_episode_returns_list = []
     sarsa_episode_success_list = []
