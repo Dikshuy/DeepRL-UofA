@@ -103,8 +103,8 @@ if __name__ == '__main__':
 
     explorer = epsilon_greedy_explorers.ConstantEpsilonGreedyExploration(1.0, num_actions)
 
-    feature_extractor = feature_extraction.good_features
-    num_features = 625 * num_actions
+    feature_extractor = feature_extraction.good_features_extractor
+    num_features = 9 * num_actions
     sarsa_episode_returns_list = []
     sarsa_episode_success_list = []
     np.random.seed(args.seed)
