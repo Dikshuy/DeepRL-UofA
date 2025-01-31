@@ -12,6 +12,7 @@ def agent_environment_episode_loop(agent, env, num_episodes):
             observation = next_observation
             episode_return += reward
             done = terminated or truncated
+        print(f"Episode {episode} return: {episode_return}")    # remove this line
         episode_returns.append(episode_return)
         # end your code
     return episode_returns
