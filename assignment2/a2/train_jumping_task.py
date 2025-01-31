@@ -101,17 +101,21 @@ if __name__ == '__main__':
     env = get_env(args.config, args.render)
     num_actions = env.action_space.n
 
-    explorer = epsilon_greedy_explorers.ConstantEpsilonGreedyExploration(1.0, num_actions)
+    # explorer = epsilon_greedy_explorers.ConstantEpsilonGreedyExploration(1.0, num_actions)
+    explorer = epsilon_greedy_explorers.AdaptiveEpsilonGreedyExploration(0.5, 0.05, 0.001, num_actions)
 
-    feature_extractor = feature_extraction.good_features_extractor
-    num_features = 9 * num_actions
+    feature_extractor = feature_extraction.improved_features_extractor
+    num_features = 16 * num_actions
     sarsa_episode_returns_list = []
     sarsa_episode_success_list = []
     np.random.seed(args.seed)
     for seed in range(args.num_seeds):
-        agent = semi_gradient_sarsa.SemiGradientSARSA(num_features, num_actions, feature_extractor, 0.01, explorer, 0.9, 10.)
+        agent = semi_gradient_sarsa.SemiGradientSARSA(num_features, num_actions, feature_extractor, 0.01, explorer, 0.99, 10.) # original 0.9
         episode_returns_sarsa = agent_environment.agent_environment_episode_loop(agent, env, args.num_training_episodes)
         episode_successes = [1 if episode_return > 140 else 0 for episode_return in episode_returns_sarsa]
+        performance = np.sum(episode_successes[:500])
+        print(f"Performance: {performance/500}")
+        print("******************************************")
         sarsa_episode_returns_list.append(episode_returns_sarsa)
         sarsa_episode_success_list.append(episode_successes)
     plot_alg_results(sarsa_episode_returns_list, f"jumping_task_config_{args.config}.png", label="Semi-Gradient SARSA")
