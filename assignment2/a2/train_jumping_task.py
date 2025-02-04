@@ -102,10 +102,10 @@ if __name__ == '__main__':
     num_actions = env.action_space.n
 
     # explorer = epsilon_greedy_explorers.ConstantEpsilonGreedyExploration(1.0, num_actions)
-    explorer = epsilon_greedy_explorers.AdaptiveEpsilonGreedyExploration(0.5, 0.05, 0.001, num_actions)
+    explorer = epsilon_greedy_explorers.AdaptiveEpsilonGreedyExploration(1.0, 0.01, 0.005, num_actions)
 
-    feature_extractor = feature_extraction.improved_features_extractor
-    num_features = 16 * num_actions
+    feature_extractor = feature_extraction.test_features_extractor
+    num_features = 12 * num_actions
     sarsa_episode_returns_list = []
     sarsa_episode_success_list = []
     np.random.seed(args.seed)
@@ -116,6 +116,7 @@ if __name__ == '__main__':
         performance = np.sum(episode_successes[:500])
         print(f"Performance: {performance/500}")
         print("******************************************")
+        # exit()
         sarsa_episode_returns_list.append(episode_returns_sarsa)
         sarsa_episode_success_list.append(episode_successes)
     plot_alg_results(sarsa_episode_returns_list, f"jumping_task_config_{args.config}.png", label="Semi-Gradient SARSA")
