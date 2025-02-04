@@ -119,6 +119,28 @@ def compute_epsilon_greedy_action_probs(q_vals, epsilon):
 	return action_probabilities	
 
 
+class AdaptiveEpsilonGreedyExploration:
+    """Epsilon-greedy with adaptive epsilon
+    
+    Args:
+      initial_epsilon: indicating the initial value of epsilon
+	  min_epsilon: indicating the minimum value of epsilon
+	  decay_rate: indicating the decay rate of epsilon
+	  num_actions: indicating the number of actions
+    """
+    def __init__(self, initial_epsilon, min_epsilon, decay_rate, num_actions):
+        self.epsilon = initial_epsilon
+        self.min_epsilon = min_epsilon
+        self.decay_rate = decay_rate
+        self.num_actions = num_actions
+        self.episode_count = 0
+        self.successful_episodes = 0
+        
+    def select_action(self, action_values) -> int:
+        self.epsilon = max(self.min_epsilon, self.epsilon * (1 - self.decay_rate))
+        
+        action_probs = compute_epsilon_greedy_action_probs(action_values, self.epsilon)
+        return np.random.choice(len(action_probs), p=action_probs)
 
 class ConstantEpsilonGreedyExploration:
     """Epsilon-greedy with constant epsilon.
@@ -182,6 +204,7 @@ def good_features_extractor(obs, action):
         agent_max_y = max(x for _, x in agent_positions)
 
     # height and width of the agent
+    # is this correct?
     agent_height = agent_max_x - agent_min_x + 1 + 1    # +1 to include the floor
     agent_width = agent_max_y - agent_min_y + 1
 
@@ -206,30 +229,7 @@ def good_features_extractor(obs, action):
     obstacle_height = normalize_height(obstacle_height, height)
     obstacle_width = normalize_width(obstacle_width, width)
 
-    # current position of the agent and the obstacle
-    current_agent_position = agent_min_y + agent_width // 2
-    current_obstacle_position = obstacle_min_y + obstacle_width // 2
-
-    # normalize the current position of the agent and the obstacle
-    current_agent_position = normalize_width(current_agent_position, width)
-    current_obstacle_position = normalize_width(current_obstacle_position, width)
-
-    # distance between agent and obstacle
-    distance = current_obstacle_position - current_agent_position
-
-    # normalize the distance
-    distance = np.exp(1 - normalize_width(distance, width))
-
-    agent_y_position = agent_min_x + agent_height // 2
-    obstacle_y_position = obstacle_min_x + obstacle_height // 2
-
-    # normalize the y position of the agent and the obstacle
-    agent_y_position = normalize_height(agent_y_position, height)
-    obstacle_y_position = normalize_height(obstacle_y_position, height)
-
-    features = [agent_width, agent_height, obstacle_width, obstacle_height, current_agent_position, current_obstacle_position, distance, agent_y_position, obstacle_y_position]
-
-    good_features[num_state_features * action: num_state_features * (action+1)] = features
+    
     
     return good_features
 
@@ -342,7 +342,7 @@ if __name__ == '__main__':
     env = get_env(args.config, args.render)
     num_actions = env.action_space.n
 
-    explorer = ConstantEpsilonGreedyExploration(1.0, num_actions)
+    explorer = AdaptiveEpsilonGreedyExploration(0.5, 0.05, 0.001, num_actions)
 
     feature_extractor = good_features_extractor
     num_features = 9 * num_actions
@@ -350,7 +350,7 @@ if __name__ == '__main__':
     sarsa_episode_success_list = []
     np.random.seed(args.seed)
     for seed in range(args.num_seeds):
-        agent = SemiGradientSARSA(num_features, num_actions, feature_extractor, 0.01, explorer, 0.9, 10.)
+        agent = SemiGradientSARSA(num_features, num_actions, feature_extractor, 0.01, explorer, 0.99, 10.)
         episode_returns_sarsa = agent_environment_episode_loop(agent, env, args.num_training_episodes)
         episode_successes = [1 if episode_return > 140 else 0 for episode_return in episode_returns_sarsa]
         sarsa_episode_returns_list.append(episode_returns_sarsa)
