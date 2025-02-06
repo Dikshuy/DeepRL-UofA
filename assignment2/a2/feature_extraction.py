@@ -23,7 +23,7 @@ def draw_env(obs):
 
 def good_feature_extractor(obs, action):
     num_actions = 2
-    num_state_features = 9
+    num_state_features = 7
 
     features = np.zeros(num_state_features * num_actions)
 
@@ -76,18 +76,31 @@ def good_feature_extractor(obs, action):
         idx = a * num_state_features
 
         features[idx] = agent_height / height
-        features[idx + 1] = agent_max_y / height
-        features[idx + 2] = distance_from_goal / width
-        features[idx + 3] = distance_from_obstacle / width
-        features[idx + 4] = jump_height / height
-        features[idx + 5] = in_air
-        features[idx + 6] = optimal_jump_point
-        features[idx + 7] = 1.0 if a == action else 0.0
+        # features[idx + 1] = agent_max_y / height
+        features[idx + 1] = distance_from_goal / width
+        features[idx + 2] = distance_from_obstacle / width
+        features[idx + 3] = jump_height / height
+        features[idx + 4] = in_air
+        # features[idx + 5] = optimal_jump_point
+        features[idx + 6] = 1.0 if a == action else 0.0
 
         if action == 0:
-            features[idx + 8] = 1.0 if distance_from_obstacle > obstacle_height else 0.0
+            features[idx + 6] = 1.0 if distance_from_obstacle > obstacle_height else 0.0
         else:
-            features[idx + 8] = 1.0 if distance_from_obstacle == obstacle_height else 0.0
+            features[idx + 6] = 1.0 if distance_from_obstacle == obstacle_height else 0.0
+
+        # features[idx] = distance_from_goal / width
+        # features[idx + 1] = distance_from_obstacle / width
+        # features[idx + 2] = optimal_jump_point * (action == 0)
+        # features[idx + 3] = not(optimal_jump_point) * (action == 0)
+        # features[idx + 4] = optimal_jump_point * (action == 1)
+        # features[idx + 5] = not(optimal_jump_point) * (action == 1)
+        # features[idx + 6] = 1.0 if a == action else 0.0
+
+        # if action == 0:
+        #     features[idx + 3] = 1.0 if distance_from_obstacle > obstacle_height else 0.0
+        # else:
+        #     features[idx + 3] = 1.0 if distance_from_obstacle <= obstacle_height else 0.0
     
 
     return features
