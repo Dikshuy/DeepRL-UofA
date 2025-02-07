@@ -93,14 +93,13 @@ class SemiGradientSARSA:
         # End your code here
 
 class NStepSemiGradientSARSA:
-    """Class that implements N-step Linear Semi-gradient SARSA with decaying learning rate."""
+    """Class that implements N-step Linear Semi-gradient SARSA."""
     
     def __init__(self,
                  num_state_action_features,
                  num_actions,
                  feature_extractor,
-                 initial_step_size,
-                 step_size_decay_rate,
+                 step_size,
                  explorer,
                  discount,
                  n_steps,
@@ -108,55 +107,50 @@ class NStepSemiGradientSARSA:
         self.num_state_action_features = num_state_action_features
         self.num_actions = num_actions
         self.explorer = explorer
-        self.initial_step_size = initial_step_size
-        self.step_size_decay_rate = step_size_decay_rate
+        self.step_size = step_size
         self.feature_extractor = feature_extractor
         self.w = np.full(num_state_action_features, initial_weight_value)
         self.discount = discount
         self.n_steps = n_steps
         
-        # Initialize experience buffer
-        self.experience = deque(maxlen=n_steps)
-        self.step_count = 0
+        self.buffer = deque(maxlen=n_steps)
+        self.total_steps = 0
         
-        # Store previous state and action
         self.prev_state = None
         self.prev_action = None
     
-    def get_decayed_step_size(self):
-        """Calculate the decayed learning rate based on step count."""
-        return self.initial_step_size / (1 + self.step_size_decay_rate * self.step_count)
-    
     def compute_n_step_return(self, terminated=False):
-        """Compute the n-step return from stored experience."""
-        if len(self.experience) < self.n_steps and not terminated:
+        """Computes the n-step return from the buffer
+        """
+        if len(self.buffer) < self.n_steps and not terminated:
             return None
             
-        n = len(self.experience) if terminated else self.n_steps
+        n = len(self.buffer) if terminated else self.n_steps
         G = 0
         for i in range(n):
-            G += (self.discount ** i) * self.experience[i][2]  # reward is at index 2
+            G += (self.discount ** i) * self.buffer[i][2]
             
-        # Add bootstrap value if not terminated
-        if not terminated and len(self.experience) >= self.n_steps:
-            last_state = self.experience[-1][3]  # next_state is at index 3
-            last_action = self.experience[-1][4]  # next_action is at index 4
+        if not terminated and len(self.buffer) >= self.n_steps:
+            last_state = self.buffer[-1][3]
+            last_action = self.buffer[-1][4]
             last_features = self.feature_extractor(last_state, last_action)
-            bootstrap_value = compute_q_values(last_features, self.w)
-            G += (self.discount ** n) * bootstrap_value
+            q_value_n = compute_q_values(last_features, self.w)
+            G += (self.discount ** n) * q_value_n
             
         return G
     
     def update_weights(self, n_step_return, initial_features):
-        """Update weights using n-step return and initial state-action features."""
+        """Updates the weights of the agent
+        """
         current_q = compute_q_values(initial_features, self.w)
         td_error = n_step_return - current_q
-        step_size = self.get_decayed_step_size()
+        step_size = self.step_size
         self.w += step_size * td_error * initial_features
-        self.step_count += 1
+        self.total_steps += 1
     
     def act(self, obs) -> int:
-        """Returns an action based on the current policy."""
+        """Returns an integer 
+        """
         self.prev_state = obs
         action_values = get_action_values(obs, self.feature_extractor, self.w, self.num_actions)
         action = self.explorer.select_action(action_values)
@@ -164,28 +158,26 @@ class NStepSemiGradientSARSA:
         return action
     
     def process_transition(self, obs: int, reward: float, terminated: bool, truncated: bool) -> None:
-        """Process a transition and update weights if necessary."""
+        """Observe consequences of the last action and update estimates accordingly.
+
+        Returns:
+            None
+        """
         state = self.prev_state
         action = self.prev_action
         next_state = obs
         next_action = self.act(obs)
         
-        # Store experience tuple
-        self.experience.append((state, action, reward, next_state, next_action))
+        self.buffer.append((state, action, reward, next_state, next_action))
         
-        # If we have enough experience or episode terminated, perform update
         n_step_return = self.compute_n_step_return(terminated)
+
         if n_step_return is not None:
-            initial_features = self.feature_extractor(
-                self.experience[0][0],  # initial state
-                self.experience[0][1]   # initial action
-            )
+            initial_features = self.feature_extractor(self.buffer[0][0], self.buffer[0][1])
             self.update_weights(n_step_return, initial_features)
             
-            # Remove oldest experience if not terminated
             if not terminated:
-                self.experience.popleft()
+                self.buffer.popleft()
         
-        # Clear experience buffer at end of episode
         if terminated:
-            self.experience.clear()
+            self.buffer.clear()
