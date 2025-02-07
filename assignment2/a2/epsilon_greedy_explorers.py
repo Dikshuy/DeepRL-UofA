@@ -50,13 +50,12 @@ class AdaptiveEpsilonGreedyExploration:
 	  decay_rate: indicating the decay rate of epsilon
 	  num_actions: indicating the number of actions
     """
+    
     def __init__(self, initial_epsilon, min_epsilon, decay_rate, num_actions):
         self.epsilon = initial_epsilon
         self.min_epsilon = min_epsilon
         self.decay_rate = decay_rate
         self.num_actions = num_actions
-        self.episode_count = 0
-        self.successful_episodes = 0
         
     def select_action(self, action_values) -> int:
         self.epsilon = max(self.min_epsilon, self.epsilon * (1 - self.decay_rate))

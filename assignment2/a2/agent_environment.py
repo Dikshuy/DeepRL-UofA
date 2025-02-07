@@ -1,4 +1,3 @@
-import time
 def agent_environment_episode_loop(agent, env, num_episodes):
     episode_returns = []
     for episode in range(num_episodes):
@@ -12,12 +11,9 @@ def agent_environment_episode_loop(agent, env, num_episodes):
             action = agent.act(observation)
             next_observation, reward, terminated, truncated, info = env.step(action)
             agent.process_transition(next_observation, reward, terminated, truncated)
-            # print(f"---step:{i}--{action}---")
-            # time.sleep(1)
             observation = next_observation
             episode_return += reward
             done = terminated or truncated
-        print(f"Episode {episode} return: {episode_return}")    # remove this line
         episode_returns.append(episode_return)
         # end your code
     return episode_returns
