@@ -7,9 +7,6 @@ import matplotlib.pyplot as plt
 import jumping_task
 from jumping_task.envs import JumpTaskEnv
 import feature_extraction
-
-import feature_extraction_dump
-
 import epsilon_greedy_explorers
 
 CCID="ddikshan"
@@ -105,13 +102,14 @@ if __name__ == '__main__':
     num_actions = env.action_space.n
 
     feature_extractor = feature_extraction.good_feature_extractor
-    num_features = 11 * num_actions
+    num_features = 10 * num_actions
     sarsa_episode_returns_list = []
     sarsa_episode_success_list = []
     np.random.seed(args.seed)
     for seed in range(args.num_seeds):
-        explorer = epsilon_greedy_explorers.AdaptiveEpsilonGreedyExploration(1.0, 0.001, 0.001, num_actions)
-        agent = semi_gradient_sarsa.SemiGradientSARSA(num_features, num_actions, feature_extractor, 0.01, explorer, 0.99, 10.)
+        explorer = epsilon_greedy_explorers.AdaptiveEpsilonGreedyExploration(1.0, 0.0001, 0.0001, num_actions)
+        # agent = semi_gradient_sarsa.SemiGradientSARSA(num_features, num_actions, feature_extractor, 0.014, explorer, 0.99, 10.)
+        agent = semi_gradient_sarsa.NStepSemiGradientSARSA(num_features, num_actions, feature_extractor, 0.014, explorer, 0.99, 7, 10.)
         episode_returns_sarsa = agent_environment.agent_environment_episode_loop(agent, env, args.num_training_episodes)
         episode_successes = [1 if episode_return > 140 else 0 for episode_return in episode_returns_sarsa]
         print("******************************************")
