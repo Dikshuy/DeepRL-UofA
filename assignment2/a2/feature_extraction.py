@@ -23,21 +23,24 @@ def draw_env(obs):
 
 def good_feature_extractor(obs, action):
     num_actions = 2
-    num_state_features = 11
+    num_state_features = 10
     features = np.zeros(num_state_features * num_actions)
-
+    
     env = obs[::-1]
     env = env[1:-1, 1:-1]
     height, width = env.shape
-
+    
+    # get floor height
     floor_height = None
-    for i in range(1, height - 1):
+    for i in range(1, height-1):
         if np.all(env[i] == 1.0):
             floor_height = i
             break
-
+            
+    # agent info
     agent_positions = np.where(env == 1.0)
     agent_positions = [(y, x) for y, x in zip(agent_positions[0], agent_positions[1]) if y < floor_height]
+    
     agent_min_y = min(y for y, _ in agent_positions)
     agent_max_y = max(y for y, _ in agent_positions) + 1
     agent_min_x = min(x for _, x in agent_positions)
@@ -45,55 +48,87 @@ def good_feature_extractor(obs, action):
     agent_height = agent_max_y - agent_min_y
     agent_width = agent_max_x - agent_min_x
 
+    # obstacle info
     obstacle_positions = np.where(env == 0.5)
     obstacle_positions = [(y, x) for y, x in zip(obstacle_positions[0], obstacle_positions[1]) if y < floor_height]
+    
+    x_positions = sorted(set(x for _, x in obstacle_positions))
+    obstacle_groups = []
+    current_group = []
+    
+    for i in range(len(x_positions)):
+        if i == 0 or x_positions[i] - x_positions[i-1] > 1:
+            if current_group:
+                obstacle_groups.append(current_group)
+            current_group = [x_positions[i]]
+        else:
+            current_group.append(x_positions[i])
+    if current_group:
+        obstacle_groups.append(current_group)
+    
+    obstacles_info = []
+    for group in obstacle_groups:
+        group_positions = [(y, x) for y, x in obstacle_positions if x in group]
+        
+        obstacle_min_y = min(y for y, _ in group_positions)
+        obstacle_max_y = max(y for y, _ in group_positions) + 1
+        obstacle_min_x = min(x for _, x in group_positions)
+        obstacle_max_x = max(x for _, x in group_positions) + 1
+        obstacle_height = obstacle_max_y - obstacle_min_y
+        obstacle_width = obstacle_max_x - obstacle_min_x
+        distance_from_obstacle = obstacle_min_x - agent_max_x
+        
+        obstacles_info.append({
+            'height': obstacle_height,
+            'width': obstacle_width,
+            'distance': distance_from_obstacle,
+            'min_x': obstacle_min_x
+        })
+    
+    obstacles_info.sort(key=lambda x: x['distance'])
 
-    obstacle_positions_sorted = sorted(obstacle_positions, key=lambda pos: pos[1])
-
-    obstacle1_min_y = min(y for y, _ in obstacle_positions_sorted)
-    obstacle1_max_y = max(y for y, _ in obstacle_positions_sorted) + 1
-    obstacle1_min_x = min(x for _, x in obstacle_positions_sorted)
-    obstacle1_max_x = max(x for _, x in obstacle_positions_sorted) + 1
-    obstacle1_height = obstacle1_max_y - obstacle1_min_y
-    obstacle1_width = obstacle1_max_x - obstacle1_min_x
-    distance_from_obstacle1 = obstacle1_min_x - agent_max_x
-
-    obstacle2_min_y = min(y for y, _ in obstacle_positions_sorted[1:])
-    obstacle2_max_y = max(y for y, _ in obstacle_positions_sorted[1:]) + 1
-    obstacle2_min_x = min(x for _, x in obstacle_positions_sorted[1:])
-    obstacle2_max_x = max(x for _, x in obstacle_positions_sorted[1:]) + 1
-    obstacle2_height = obstacle2_max_y - obstacle2_min_y
-    obstacle2_width = obstacle2_max_x - obstacle2_min_x
-    distance_from_obstacle2 = obstacle2_min_x - agent_max_x
-
-    # Compute additional features
+    # global vars
     distance_from_goal = width - agent_max_x
     jump_height = floor_height - agent_max_y
     in_air = float(jump_height > 0)
-
-    # Optimal jump points for both obstacles
-    optimal_jump_point1 = float(distance_from_obstacle1 == obstacle1_height)
-    optimal_jump_point2 = float(distance_from_obstacle2 == obstacle2_height)
-
-    # Populate the feature vector
+    
     for a in range(num_actions):
         idx = a * num_state_features
-        features[idx] = agent_height / height  # Normalized agent height
-        features[idx + 1] = distance_from_goal / width  # Normalized distance to goal
-        features[idx + 2] = distance_from_obstacle1 / width  # Normalized distance to obstacle 1
-        features[idx + 3] = distance_from_obstacle2 / width  # Normalized distance to obstacle 2
-        features[idx + 4] = jump_height / height  # Normalized jump height
-        features[idx + 5] = in_air  # Whether the agent is in the air
-        features[idx + 6] = optimal_jump_point1  # Optimal jump point for obstacle 1
-        features[idx + 7] = optimal_jump_point2  # Optimal jump point for obstacle 2
-        features[idx + 8] = 1.0 if a == action else 0.0  # Action indicator
-
-        # Additional logic for action-specific features
+        
+        # get nearest obstacle info
+        nearest_obstacle = obstacles_info[0]
+        
+        features[idx + 0] = agent_height / height
+        features[idx + 1] = distance_from_goal / width
+        features[idx + 2] = nearest_obstacle['distance'] / width
+        features[idx + 3] = jump_height / height
+        features[idx + 4] = in_air
+        features[idx + 5] = 1.0 if a == action else 0.0
+        
+        # action specific features
         if action == 0:
-            features[idx + 9] = 1.0 if distance_from_obstacle1 > obstacle1_height else 0.0
-            features[idx + 10] = 1.0 if distance_from_obstacle2 > obstacle2_height else 0.0
+            features[idx + 6] = 1.0 if nearest_obstacle['distance'] > nearest_obstacle['height'] else 0.0
         else:
-            features[idx + 9] = 1.0 if distance_from_obstacle1 == obstacle1_height else 0.0
-            features[idx + 10] = 1.0 if distance_from_obstacle2 == obstacle2_height else 0.0
+            features[idx + 6] = 1.0 if nearest_obstacle['distance'] == nearest_obstacle['height'] else 0.0
+        
+        # features for second obstacle (if exists)
+        if len(obstacles_info) > 1:
+            next_obstacle = obstacles_info[1]
+            optimal_jump_point_2 = float(next_obstacle['distance'] == next_obstacle['height'])
 
+            features[idx + 7] = next_obstacle['distance'] / width
+            features[idx + 8] = optimal_jump_point_2 / height
+            if action == 0:
+                features[idx + 9] = 1.0 if next_obstacle['distance'] > next_obstacle['height'] else 0.0
+            else:
+                features[idx + 9] = 1.0 if next_obstacle['distance'] == next_obstacle['height'] else 0.0
+        else:
+            # if no second obstacle, set all features to 0
+            features[idx + 7] = 0.0
+            features[idx + 8] = 0.0
+            features[idx + 9] = 0.0
+
+        # I was trying to make it more smarter so that it can work for any number of obstacles but I was not able to fully automate it :(
+        # Currently, it only works for two obstacles
+    
     return features
