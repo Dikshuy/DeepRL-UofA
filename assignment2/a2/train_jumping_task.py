@@ -112,7 +112,6 @@ if __name__ == '__main__':
         agent = semi_gradient_sarsa.NStepSemiGradientSARSA(num_features, num_actions, feature_extractor, 0.014, explorer, 0.99, 7, 10.)
         episode_returns_sarsa = agent_environment.agent_environment_episode_loop(agent, env, args.num_training_episodes)
         episode_successes = [1 if episode_return > 140 else 0 for episode_return in episode_returns_sarsa]
-        print("******************************************")
         sarsa_episode_returns_list.append(episode_returns_sarsa)
         sarsa_episode_success_list.append(episode_successes)
     plot_alg_results(sarsa_episode_returns_list, f"jumping_task_config_{args.config}.png", label="Semi-Gradient SARSA")
