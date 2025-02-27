@@ -10,7 +10,7 @@ import torch.nn as nn
 import replay_buffer
 import argparse
 
-CCID="machado"
+CCID="ddikshan"
 
 class LinearDecayEpsilonGreedyExploration:
     """Epsilon-greedy with constant epsilon.
@@ -166,7 +166,7 @@ if __name__ == '__main__':
                 optimizer = torch.optim.Adam(q_network.parameters(), lr=lr, eps=optimizer_eps)
                 explorer = LinearDecayEpsilonGreedyExploration(initial_epsilon, final_epsilon, epsilon_decay_steps, num_actions)
                 buffer = replay_buffer.ReplayBuffer(buffer_size, discount=discount, n_step=n_step)
-                agent = dqn.DQN(q_network, optimizer, buffer, explorer, discount, target_update_interval,
+                agent = agent_class(q_network, optimizer, buffer, explorer, discount, target_update_interval,
                                 min_replay_size_before_updates=min_replay_size_before_updates, minibatch_size=minibatch_size)
                 episode_returns, q_values = agent_environment.agent_environment_episode_loop(agent, env, num_training_episodes, args.debug, args.track_q)
                 alg_returns.append(episode_returns)
