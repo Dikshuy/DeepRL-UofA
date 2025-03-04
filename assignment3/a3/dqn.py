@@ -39,24 +39,56 @@ class DQN:
         self.track_statistics = track_statistics
         self.reward_phi = reward_phi
         # your code here
+        self.total_steps = 0
+        self.last_obs = None
+        self.last_action = None
+        self.update_rate = 0
         # end your code
 
     def act(self, obs) -> int:
         """Returns an integer 
         """
         # Your code here
-        action = 0 # replace this line
+        self.last_obs = obs
+        obs_tensor = torch.tensor(obs, dtype=torch.float32)
+        with torch.no_grad():
+            q_values = self.q_network(obs_tensor)
+        action = self.explorer.select_action(q_values.detach().numpy())
+        self.last_action = action
         # End your code here
         return action
 
     def compute_targets(self, batched_rewards, batched_next_states, batched_discounts, batch_terminated):
         # your code here
-        pass
+        with torch.no_grad():
+            next_q_values = self.target_network(batched_next_states).max(dim=1)[0]
+            targets = batched_rewards + batched_discounts * next_q_values * (1 - batch_terminated)
+        return targets
         # End your code here
 
     def gradient_update(self):
         minibatch = self.replay_buffer.sample(self.minibatch_size)
         # your code here
+        batched_states = torch.tensor([transition['state'] for transition in minibatch], dtype=torch.float32)
+        batched_actions = torch.tensor([transition['action'] for transition in minibatch], dtype=torch.int64)
+        batched_rewards = torch.tensor([transition['reward'] for transition in minibatch], dtype=torch.float32)
+        batched_next_states = torch.tensor([transition['next_state'] for transition in minibatch], dtype=torch.float32)
+        batched_discounts = torch.tensor([transition['discount'] for transition in minibatch], dtype=torch.float32)
+        batch_terminated = torch.tensor([transition['terminated'] for transition in minibatch], dtype=torch.float32)
+
+        q_values = self.q_network(batched_states)
+        q_values = q_values.gather(1, batched_actions.unsqueeze(1)).squeeze(1)
+        targets = self.compute_targets(batched_rewards, batched_next_states, batched_discounts, batch_terminated)
+        
+        loss = torch.nn.functional.mse_loss(q_values, targets)
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        self.update_rate += 1
+        if self.update_rate % self.gradient_updates_per_target_refresh == 0:
+            self.target_network = target_network_refresh(self.q_network)
         # End your code here
 
 
@@ -72,4 +104,9 @@ class DQN:
         # refresh target networks if needed, etc.
         
         # Your code here
+        if self.last_obs is not None and self.last_action is not None:
+            self.replay_buffer.append(self.last_obs, self.last_action, reward, obs, terminated, truncated)
+            self.total_steps += 1
+            if self.total_steps >= self.min_replay_size_before_updates and self.total_steps % self.gradient_update_frequency == 0:
+                self.gradient_update()
         # End your code here
