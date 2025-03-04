@@ -15,7 +15,7 @@ import pandas as pd
 import os
 
 
-CCID="machado"
+CCID="ddikshan"
 
 class LinearDecayEpsilonGreedyExploration:
     """Epsilon-greedy with constant epsilon.
@@ -124,15 +124,32 @@ def get_env(config_num, render=False):
                     max_number_of_steps=300, two_obstacles=True, finish_jump=False)
     return env
 
+class JumpingTaskQNetwork(nn.Module):
+    def __init__(self, _, num_actions):
+        super(JumpingTaskQNetwork, self).__init__()
+        self.network = nn.Sequential(
+            nn.Conv2d(1, 16, kernel_size=3),
+            nn.ReLU(),
+            nn.Conv2d(16, 32, kernel_size=3),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(32 * 7 * 7, 256),
+            nn.ReLU(),
+            nn.Linear(256, num_actions)
+        )
+
+    def forward(self, x):
+        return self.network(x)
+
 def input_preprocessor(x):
     # your code here (optional)
-    return x # feel free to remove to make dimensions work
+    return x[1:-1, 1:-1]  # remove the border
     # end your code 
     
 
 def reward_phi(r):
     # your code here (optional)
-    reward = r # you may remove this line
+    reward = r - 1 # remove per step +1 reward
     # end your code
     return reward
  
@@ -151,11 +168,11 @@ if __name__ == '__main__':
     num_actions = env.action_space.n
 
     explorer = LinearDecayEpsilonGreedyExploration(1.0, 0.01, 10, num_actions)
-    q_network = None # replace
+    q_network = JumpingTaskQNetwork(env.observation_space.low.size, num_actions)
     optimizer = torch.optim.Adam(q_network.parameters())
     buffer = replay_buffer.ReplayBuffer(100, discount=0.99, n_step=1)
 
-    agent = dqn.DQN(q_network, optimizer, buffer, explorer, 0.99, 10, gradient_update_frequency=1,
+    agent = double_dqn.DoubleDQN(q_network, optimizer, buffer, explorer, 0.99, 10, gradient_update_frequency=1,
                     input_preprocessor=input_preprocessor,
                     min_replay_size_before_updates=args.min_replay_size_before_updates, reward_phi=reward_phi)
     episode_returns, _ = agent_environment.agent_environment_episode_loop(agent, env, args.num_training_episodes, args.debug, args.track_q)
