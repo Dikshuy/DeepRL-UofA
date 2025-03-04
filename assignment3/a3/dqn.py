@@ -69,12 +69,12 @@ class DQN:
     def gradient_update(self):
         minibatch = self.replay_buffer.sample(self.minibatch_size)
         # your code here
-        batched_states = torch.tensor([transition['state'] for transition in minibatch], dtype=torch.float32)
-        batched_actions = torch.tensor([transition['action'] for transition in minibatch], dtype=torch.int64)
-        batched_rewards = torch.tensor([transition['reward'] for transition in minibatch], dtype=torch.float32)
-        batched_next_states = torch.tensor([transition['next_state'] for transition in minibatch], dtype=torch.float32)
-        batched_discounts = torch.tensor([transition['discount'] for transition in minibatch], dtype=torch.float32)
-        batch_terminated = torch.tensor([transition['terminated'] for transition in minibatch], dtype=torch.float32)
+        batched_states = torch.tensor(np.array([transition['state'] for transition in minibatch]), dtype=torch.float32)
+        batched_actions = torch.tensor(np.array([transition['action'] for transition in minibatch]), dtype=torch.int64) 
+        batched_rewards = torch.tensor(np.array([transition['reward'] for transition in minibatch]), dtype=torch.float32)
+        batched_next_states = torch.tensor(np.array([transition['next_state'] for transition in minibatch]), dtype=torch.float32)
+        batched_discounts = torch.tensor(np.array([transition['discount'] for transition in minibatch]), dtype=torch.float32)
+        batch_terminated = torch.tensor(np.array([transition['terminated'] for transition in minibatch]), dtype=torch.float32)
 
         q_values = self.q_network(batched_states)
         q_values = q_values.gather(1, batched_actions.unsqueeze(1)).squeeze(1)
