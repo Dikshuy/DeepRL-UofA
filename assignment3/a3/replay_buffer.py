@@ -23,28 +23,36 @@ class ReplayBuffer:
 
     def create_multistep_transition(self, index):
         # your code here
+        if self.n_step == 1:
+            return self.buffer[index]
+        
         transition = self.buffer[index]
         state = transition['state']
         action = transition['action']
-        reward = transition['reward']
+        n_step_reward = transition['reward']
         next_state = transition['next_state']
-        discount = transition['discount']
         terminated = transition['terminated']
         truncated = transition['truncated']
+        discount = self.discount
+
         for i in range(1, self.n_step):
-            if i >= len(self.buffer):
+            next_index = (index + i) % len(self.buffer)
+            if next_index <= index or terminated or truncated:
                 break
-            transition = self.buffer[index + i]
-            reward += transition['reward'] * (self.discount ** i)
-            next_state = transition['next_state']
-            discount *= transition['discount']
-            if transition['terminated']:
-                terminated = True
-                break
-            if transition['truncated']:
-                truncated = True
-                break
-        return {'state': state, 'action': action, 'reward': reward, 'next_state': next_state, 'discount': discount, 'terminated': terminated, 'truncated': truncated}
+            next_transition = self.buffer[next_index]
+            n_step_reward += discount * next_transition['reward']
+            discount *= self.discount
+            next_state = next_transition['next_state']
+            terminated = next_transition['terminated']
+            truncated = next_transition['truncated']
+
+        return {'state': state,
+                'action': action,
+                'reward': n_step_reward,
+                'next_state': next_state,
+                'discount': discount,
+                'terminated': terminated,
+                'truncated': truncated}
         # end your code
 
     def sample(self, n_transitions):
