@@ -162,7 +162,7 @@ def reward_phi(r):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", help="Which environment", type=int, choices=[1,2,3], default=1)
-    parser.add_argument("--num-training-episodes", help="How many episodes you want to train your agent", default=5000, type=int)
+    parser.add_argument("--num-training-episodes", help="How many episodes you want to train your agent", default=3000, type=int)
     parser.add_argument("--run-label", help="Akin to a random seed", default=1, type=int)
     parser.add_argument("--render", action='store_true')
     parser.add_argument("--debug", action='store_true')
@@ -176,40 +176,34 @@ if __name__ == '__main__':
     parser.add_argument("--decay-steps", help="Epsilon decay steps", type=int, default=10000)
     parser.add_argument("--buffer-size", help="Replay buffer size", type=int, default=25000)
     parser.add_argument("--discount-factor", help="Discount factor", type=float, default=0.99)
-    parser.add_argument("--target-update-interval", help="Target network update interval", type=int, default=100)
+    parser.add_argument("--target-update-interval", help="Target network update interval", type=int, default=200)
     parser.add_argument("--minibatch-size", help="Minibatch size", type=int, default=128)
     parser.add_argument("--min-replay-size", help="Minimum replay buffer size before updates", type=int, default=1000)
-    parser.add_argument("--n-step", help="N-step return", type=int, default=7)
-    parser.add_argument("--gradient-update-frequency", help="Gradient update frequency", type=int, default=1)
+    parser.add_argument("--n-step", help="N-step return", type=int, default=14)
+    parser.add_argument("--gradient-update-frequency", help="Gradient update frequency", type=int, default=4)
     
     args = parser.parse_args()
 
     env = get_env(args.config, args.render)
     num_actions = env.action_space.n
+    
+    explorer = LinearDecayEpsilonGreedyExploration(args.init_eps, args.final_eps, args.decay_steps, num_actions)
+    q_network = JumpingTaskQNetwork(env.observation_space.low.size, num_actions)
+    optimizer = torch.optim.Adam(q_network.parameters(), lr=args.lr)
+    buffer = replay_buffer.ReplayBuffer(args.buffer_size, args.discount_factor, args.n_step)
 
-    for seed in range(args.n_seeds):
-        env.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
-        torch.backends.cudnn.deterministic = True
-        
-        explorer = LinearDecayEpsilonGreedyExploration(args.init_eps, args.final_eps, args.decay_steps, num_actions)
-        q_network = JumpingTaskQNetwork(env.observation_space.low.size, num_actions)
-        optimizer = torch.optim.Adam(q_network.parameters(), lr=args.lr)
-        buffer = replay_buffer.ReplayBuffer(args.buffer_size, args.discount_factor, args.n_step)
-
-        agent = double_dqn.DoubleDQN(q_network, 
-                                    optimizer=optimizer,
-                                    replay_buffer=buffer, 
-                                    explorer=explorer, 
-                                    discount=args.discount_factor, 
-                                    gradient_updates_per_target_refresh=args.target_update_interval, 
-                                    gradient_update_frequency=args.gradient_update_frequency,
-                                    input_preprocessor=input_preprocessor,
-                                    minibatch_size=args.minibatch_size, 
-                                    min_replay_size_before_updates=args.min_replay_size, 
-                                    reward_phi=reward_phi)
-        episode_returns, _ = agent_environment.agent_environment_episode_loop(agent, env, args.num_training_episodes, args.debug, args.track_q)
-        df = pd.DataFrame(episode_returns)
-        df.to_csv(f'data/config_{args.config}_run_{seed}.csv', index=False)
-        produce_plots_for_all_configs()
+    agent = double_dqn.DoubleDQN(q_network, 
+                                optimizer=optimizer,
+                                replay_buffer=buffer, 
+                                explorer=explorer, 
+                                discount=args.discount_factor, 
+                                gradient_updates_per_target_refresh=args.target_update_interval, 
+                                gradient_update_frequency=args.gradient_update_frequency,
+                                input_preprocessor=input_preprocessor,
+                                minibatch_size=args.minibatch_size, 
+                                min_replay_size_before_updates=args.min_replay_size, 
+                                reward_phi=reward_phi)
+    episode_returns, _ = agent_environment.agent_environment_episode_loop(agent, env, args.num_training_episodes, args.debug, args.track_q)
+    df = pd.DataFrame(episode_returns)
+    df.to_csv(f'data/config_{args.config}_run_{args.run_label}.csv', index=False)
+    produce_plots_for_all_configs()
