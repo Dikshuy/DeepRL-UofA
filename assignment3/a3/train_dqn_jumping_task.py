@@ -167,46 +167,47 @@ if __name__ == '__main__':
     parser.add_argument("--render", action='store_true')
     parser.add_argument("--debug", action='store_true')
     parser.add_argument("--track-q", action='store_true')
+    
+    # hyperparameter arguments
+    parser.add_argument("--n-seeds", help="Number of seeds to run", type=int, default=1)
+    parser.add_argument("--lr", help="Learning rate", type=float, default=0.0003)
+    parser.add_argument("--init-eps", help="Initial exploration rate", type=float, default=1.0)
+    parser.add_argument("--final-eps", help="Final exploration rate", type=float, default=0.0001)
+    parser.add_argument("--decay-steps", help="Epsilon decay steps", type=int, default=10000)
+    parser.add_argument("--buffer-size", help="Replay buffer size", type=int, default=25000)
+    parser.add_argument("--discount-factor", help="Discount factor", type=float, default=0.99)
+    parser.add_argument("--target-update-interval", help="Target network update interval", type=int, default=100)
+    parser.add_argument("--minibatch-size", help="Minibatch size", type=int, default=128)
+    parser.add_argument("--min-replay-size", help="Minimum replay buffer size before updates", type=int, default=1000)
+    parser.add_argument("--n-step", help="N-step return", type=int, default=7)
+    parser.add_argument("--gradient-update-frequency", help="Gradient update frequency", type=int, default=1)
+    
     args = parser.parse_args()
 
     env = get_env(args.config, args.render)
     num_actions = env.action_space.n
 
-    # hyperparameters
-    n_seeds = 1
-    lr = 0.0003
-    init_eps = 1.0
-    final_eps = 0.001
-    decay_steps = 10000
-    buffer_size = 50000
-    discount_factor = 0.99
-    target_update_interval = 100
-    minibatch_size = 128
-    min_replay_size_before_updates = 1000
-    n_step = 7
-    gradient_update_frequency = 1
-
-    for seed in range(n_seeds):
+    for seed in range(args.n_seeds):
         env.seed(seed)
         np.random.seed(seed)
         torch.manual_seed(seed)
         torch.backends.cudnn.deterministic = True
         
-        explorer = LinearDecayEpsilonGreedyExploration(init_eps, final_eps, decay_steps, num_actions)
+        explorer = LinearDecayEpsilonGreedyExploration(args.init_eps, args.final_eps, args.decay_steps, num_actions)
         q_network = JumpingTaskQNetwork(env.observation_space.low.size, num_actions)
-        optimizer = torch.optim.Adam(q_network.parameters(), lr=lr)
-        buffer = replay_buffer.ReplayBuffer(buffer_size, discount_factor, n_step)
+        optimizer = torch.optim.Adam(q_network.parameters(), lr=args.lr)
+        buffer = replay_buffer.ReplayBuffer(args.buffer_size, args.discount_factor, args.n_step)
 
         agent = double_dqn.DoubleDQN(q_network, 
                                     optimizer=optimizer,
                                     replay_buffer=buffer, 
                                     explorer=explorer, 
-                                    discount=discount_factor, 
-                                    gradient_updates_per_target_refresh=target_update_interval, 
-                                    gradient_update_frequency=gradient_update_frequency,
+                                    discount=args.discount_factor, 
+                                    gradient_updates_per_target_refresh=args.target_update_interval, 
+                                    gradient_update_frequency=args.gradient_update_frequency,
                                     input_preprocessor=input_preprocessor,
-                                    minibatch_size=minibatch_size, 
-                                    min_replay_size_before_updates=min_replay_size_before_updates, 
+                                    minibatch_size=args.minibatch_size, 
+                                    min_replay_size_before_updates=args.min_replay_size, 
                                     reward_phi=reward_phi)
         episode_returns, _ = agent_environment.agent_environment_episode_loop(agent, env, args.num_training_episodes, args.debug, args.track_q)
         df = pd.DataFrame(episode_returns)
