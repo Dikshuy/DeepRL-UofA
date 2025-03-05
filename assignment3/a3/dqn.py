@@ -49,11 +49,12 @@ class DQN:
         """Returns an integer 
         """
         # Your code here
-        self.last_obs = obs
-        obs_tensor = torch.tensor(obs, dtype=torch.float32)
+        obs = self.input_preprocessor(obs)
+        obs = torch.tensor(obs, dtype=torch.float32)
         with torch.no_grad():
-            q_values = self.q_network(obs_tensor)
+            q_values = self.q_network(obs)
         action = self.explorer.select_action(q_values.detach().numpy())
+        self.last_obs = obs
         self.last_action = action
         # End your code here
         return action
@@ -69,17 +70,16 @@ class DQN:
     def gradient_update(self):
         minibatch = self.replay_buffer.sample(self.minibatch_size)
         # your code here
-        batched_states = torch.tensor(np.array([transition['state'] for transition in minibatch]), dtype=torch.float32)
-        batched_actions = torch.tensor(np.array([transition['action'] for transition in minibatch]), dtype=torch.int64) 
-        batched_rewards = torch.tensor(np.array([transition['reward'] for transition in minibatch]), dtype=torch.float32)
-        batched_next_states = torch.tensor(np.array([transition['next_state'] for transition in minibatch]), dtype=torch.float32)
-        batched_discounts = torch.tensor(np.array([transition['discount'] for transition in minibatch]), dtype=torch.float32)
-        batch_terminated = torch.tensor(np.array([transition['terminated'] for transition in minibatch]), dtype=torch.float32)
+        batched_states = torch.stack([transition['state'] for transition in minibatch])
+        batched_actions = torch.tensor([transition['action'] for transition in minibatch]) 
+        batched_rewards = torch.tensor([transition['reward'] for transition in minibatch])
+        batched_next_states = torch.stack([transition['next_state'] for transition in minibatch])
+        batched_discounts = torch.tensor([transition['discount'] for transition in minibatch])
+        batch_terminated = torch.tensor([transition['terminated'] for transition in minibatch])
 
-        q_values = self.q_network(batched_states)
+        q_values = self.q_network(batched_states).float()
         q_values = q_values.gather(1, batched_actions.unsqueeze(1)).squeeze(1)
-        targets = self.compute_targets(batched_rewards, batched_next_states, batched_discounts, batch_terminated)
-        
+        targets = self.compute_targets(batched_rewards, batched_next_states, batched_discounts, batch_terminated).float()
         loss = torch.nn.functional.mse_loss(q_values, targets)
 
         self.optimizer.zero_grad()
@@ -105,7 +105,7 @@ class DQN:
         
         # Your code here
         if self.last_obs is not None and self.last_action is not None:
-            self.replay_buffer.append(self.last_obs, self.last_action, reward, obs, terminated, truncated)
+            self.replay_buffer.append(self.last_obs, self.last_action, reward, self.input_preprocessor(obs), int(terminated), int(truncated))
             self.total_steps += 1
             if self.total_steps >= self.min_replay_size_before_updates and self.total_steps % self.gradient_update_frequency == 0:
                 self.gradient_update()
