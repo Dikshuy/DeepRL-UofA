@@ -42,7 +42,7 @@ class DQN:
         self.total_steps = 0
         self.last_obs = None
         self.last_action = None
-        self.update_rate = 0
+        self.episode_loss = 0
         # end your code
 
     def act(self, obs) -> int:
@@ -52,12 +52,12 @@ class DQN:
         obs = self.input_preprocessor(obs)
         obs = torch.tensor(obs, dtype=torch.float32)
         with torch.no_grad():
-            q_values = self.q_network(obs)
-        action = self.explorer.select_action(q_values.detach().numpy())
+            q_values = self.q_network(obs).detach().numpy()
+        action = self.explorer.select_action(q_values)
         self.last_obs = obs
         self.last_action = action
         # End your code here
-        return action
+        return action, q_values[action]
 
     def compute_targets(self, batched_rewards, batched_next_states, batched_discounts, batch_terminated):
         # your code here
@@ -86,9 +86,7 @@ class DQN:
         loss.backward()
         self.optimizer.step()
 
-        self.update_rate += 1
-        if self.update_rate % self.gradient_updates_per_target_refresh == 0:
-            self.target_network = target_network_refresh(self.q_network)
+        return loss.item()
         # End your code here
 
 
@@ -108,5 +106,14 @@ class DQN:
             self.replay_buffer.append(self.last_obs, self.last_action, reward, self.input_preprocessor(obs), int(terminated), int(truncated))
             self.total_steps += 1
             if self.total_steps >= self.min_replay_size_before_updates and self.total_steps % self.gradient_update_frequency == 0:
-                self.gradient_update()
+                loss = self.gradient_update()
+                self.episode_loss += loss
+            if self.total_steps % self.gradient_updates_per_target_refresh == 0:
+                self.target_network = target_network_refresh(self.q_network)
+            if terminated or truncated:
+                episode_loss = self.episode_loss
+                self.episode_loss = 0
+                return episode_loss
+            else:
+                return 0
         # End your code here
