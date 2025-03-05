@@ -137,18 +137,21 @@ class JumpingTaskQNetwork(nn.Module):
             nn.Flatten(),
             nn.Linear(1024, 512),
             nn.ReLU(),
-            nn.Linear(512, num_actions)
+            nn.Linear(512, 128),
+            nn.ReLU(),
+            nn.Linear(128, num_actions)
         )
 
-    def forward(self, x):
-        x = x.unsqueeze(0).unsqueeze(0)
-        return self.network(x)
+    def forward(self, input):
+        if len(input.shape) == 3:
+            input = input.unsqueeze(0)
+        return self.network(input).squeeze()
 
 def input_preprocessor(x):
     # your code here (optional)
-    return x[1:-1, 1:-1]  # remove the border
+    x = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
     # end your code 
-    
+    return x
 
 def reward_phi(r):
     # your code here (optional)
@@ -159,7 +162,7 @@ def reward_phi(r):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", help="Which environment", type=int, choices=[1,2,3], default=1)
-    parser.add_argument("--num-training-episodes", help="How many episodes you want to train your agent", default=20000, type=int)
+    parser.add_argument("--num-training-episodes", help="How many episodes you want to train your agent", default=5000, type=int)
     parser.add_argument("--run-label", help="Akin to a random seed", default=1, type=int)
     parser.add_argument("--render", action='store_true')
     parser.add_argument("--debug", action='store_true')
@@ -170,15 +173,15 @@ if __name__ == '__main__':
     num_actions = env.action_space.n
 
     # hyperparameters
-    n_seeds = 5
-    lr = 0.0001
+    n_seeds = 1
+    lr = 0.0003
     init_eps = 1.0
     final_eps = 0.001
     decay_steps = 10000
     buffer_size = 50000
     discount_factor = 0.99
     target_update_interval = 100
-    minibatch_size = 256
+    minibatch_size = 128
     min_replay_size_before_updates = 1000
     n_step = 7
     gradient_update_frequency = 1
@@ -191,7 +194,6 @@ if __name__ == '__main__':
         
         explorer = LinearDecayEpsilonGreedyExploration(init_eps, final_eps, decay_steps, num_actions)
         q_network = JumpingTaskQNetwork(env.observation_space.low.size, num_actions)
-        optimizer = torch.optim.Adam(q_network.parameters())
         optimizer = torch.optim.Adam(q_network.parameters(), lr=lr)
         buffer = replay_buffer.ReplayBuffer(buffer_size, discount_factor, n_step)
 
