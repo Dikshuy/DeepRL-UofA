@@ -70,6 +70,17 @@ class DQN:
     def gradient_update(self):
         minibatch = self.replay_buffer.sample(self.minibatch_size)
         # your code here
+        for transition in minibatch:
+            if isinstance(transition['state'], torch.Tensor):
+                transition['state'] = transition['state'].clone().detach().float()
+            else:
+                transition['state'] = torch.tensor(transition['state'], dtype=torch.float32)
+                
+            if isinstance(transition['next_state'], torch.Tensor):
+                transition['next_state'] = transition['next_state'].clone().detach().float()
+            else:
+                transition['next_state'] = torch.tensor(transition['next_state'], dtype=torch.float32)
+    
         batched_states = torch.stack([transition['state'] for transition in minibatch])
         batched_actions = torch.tensor([transition['action'] for transition in minibatch]) 
         batched_rewards = torch.tensor([transition['reward'] for transition in minibatch])
