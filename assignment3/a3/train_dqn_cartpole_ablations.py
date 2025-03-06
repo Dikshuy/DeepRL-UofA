@@ -146,7 +146,7 @@ if __name__ == '__main__':
     agent_class_to_text = {dqn.DQN: 'DQN'} 
 
     n_step = 1
-    colors = ['r', 'b', 'g', 'o']
+    colors = ['r', 'b', 'g', 'c']
     agent_classes = [dqn.DQN]
 
     if args.target_network_ablation:
@@ -182,12 +182,12 @@ if __name__ == '__main__':
         for agent_class in agent_classes:
             agent_text = agent_class_to_text[agent_class]
             plot_many_algs([perf_dict[target_update_interval][agent_text] for target_update_interval in target_update_intervals],
-                        [f"{target_update_interval}-update-interval {agent_text}"for target_update_interval in target_update_intervals], colors, f"{agent_text}_cartpole_target_update_intervals.png")
+                        [f"target-update-interval-{target_update_interval}({agent_text})"for target_update_interval in target_update_intervals], colors, f"{agent_text}_cartpole_target_update_intervals.png")
             
     if args.replay_buffer_ablation:
         buffer_sizes = [100, 500, 5000, 25000]
         minibatch_size = 64
-        target_update_intervals = 100
+        target_update_interval = 100
 
         perf_dict = {}
         q_val_dict = {}
@@ -217,4 +217,4 @@ if __name__ == '__main__':
         for agent_class in agent_classes:
             agent_text = agent_class_to_text[agent_class]
             plot_many_algs([perf_dict[buffer_size][agent_text] for buffer_size in buffer_sizes],
-                        [f"{buffer_size}-step {agent_text}"for buffer_size in buffer_sizes], colors, f"{agent_text}_cartpole_buffers.png")
+                        [f"buffer-size-{buffer_size}({agent_text})"for buffer_size in buffer_sizes], colors, f"{agent_text}_cartpole_buffers.png")
