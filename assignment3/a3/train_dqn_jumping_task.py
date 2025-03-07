@@ -144,7 +144,7 @@ class JumpingTaskQNetwork(nn.Module):
 
     def forward(self, input):
         if len(input.shape) == 3:
-            input = input.unsqueeze(0)
+            input = input.unsqueeze(0) 
         return self.network(input).squeeze()
 
 def input_preprocessor(x):
@@ -169,8 +169,7 @@ if __name__ == '__main__':
     parser.add_argument("--track-q", action='store_true')
     
     # hyperparameter arguments
-    parser.add_argument("--n-seeds", help="Number of seeds to run", type=int, default=1)
-    parser.add_argument("--lr", help="Learning rate", type=float, default=0.0003)
+    parser.add_argument("--step-size", help="Step size", type=float, default=0.0003)
     parser.add_argument("--init-eps", help="Initial exploration rate", type=float, default=1.0)
     parser.add_argument("--final-eps", help="Final exploration rate", type=float, default=0.0001)
     parser.add_argument("--decay-steps", help="Epsilon decay steps", type=int, default=10000)
@@ -189,7 +188,7 @@ if __name__ == '__main__':
     
     explorer = LinearDecayEpsilonGreedyExploration(args.init_eps, args.final_eps, args.decay_steps, num_actions)
     q_network = JumpingTaskQNetwork(env.observation_space.low.size, num_actions)
-    optimizer = torch.optim.Adam(q_network.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(q_network.parameters(), lr=args.step_size)
     buffer = replay_buffer.ReplayBuffer(args.buffer_size, args.discount_factor, args.n_step)
 
     agent = double_dqn.DoubleDQN(q_network, 
