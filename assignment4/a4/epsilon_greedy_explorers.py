@@ -64,3 +64,20 @@ class LinearDecayEpsilonGreedyExploration:
         self.steps += 1
         return np.random.choice(len(action_probs), p=action_probs)
     
+class GaussianNoiseExplorer:
+    """Adds Gaussian noise to continuous actions for exploration.
+    
+    Args:
+        std_dev: Standard deviation of the Gaussian noise
+        max_action: Maximum absolute value of action
+    """
+    def __init__(self, std_dev, max_action):
+        self.std_dev = std_dev
+        self.max_action = max_action
+    
+    def select_action(self, action_values):
+        """Adds Gaussian noise to the action values"""
+        noise = np.random.normal(0, self.std_dev, size=action_values.shape)
+        noisy_action = action_values + noise
+        return np.clip(noisy_action, -self.max_action, self.max_action)
+    
