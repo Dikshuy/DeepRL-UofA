@@ -39,3 +39,28 @@ class ConstantEpsilonGreedyExploration:
         action_probs = compute_epsilon_greedy_action_probs(action_values, self.epsilon)
         return np.random.choice(len(action_probs), p=action_probs)
     
+
+class LinearDecayEpsilonGreedyExploration:
+    """Epsilon-greedy with constant epsilon.
+
+    Args:
+      epsilon: float indicating the value of epsilon
+      num_actions: integer indicating the number of actions
+    """
+
+    def __init__(self, start_epsilon, end_epsilon, decay_steps, num_actions):
+        self.start_epsilon = start_epsilon
+        self.end_epsilon = end_epsilon
+        assert start_epsilon >= end_epsilon >= 0
+        self.epsilon = start_epsilon
+        self.decay_steps = decay_steps
+        self.num_actions = num_actions
+        self.steps = 0
+
+    def select_action(self, action_values) -> int:
+        epsilon_decay_step_size = (self.start_epsilon - self.end_epsilon) / self.decay_steps
+        epsilon = max(self.start_epsilon - self.steps * epsilon_decay_step_size, self.end_epsilon)
+        action_probs = compute_epsilon_greedy_action_probs(action_values, epsilon)
+        self.steps += 1
+        return np.random.choice(len(action_probs), p=action_probs)
+    
