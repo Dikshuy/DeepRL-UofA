@@ -15,7 +15,7 @@ def agent_environment_episode_loop(agent, env, num_episodes, debug=False, track_
         while not done:
             action, q_values = agent.act(observation)
             next_observation, reward, terminated, truncated, info = env.step(action)
-            loss = agent.process_transition(next_observation, reward, terminated, truncated)
+            loss, _ = agent.process_transition(next_observation, reward, terminated, truncated)
             episode_loss += loss
             observation = next_observation
             episode_return += reward
