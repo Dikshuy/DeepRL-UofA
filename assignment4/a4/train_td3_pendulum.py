@@ -6,6 +6,7 @@ import td3
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import replay_buffer
 import argparse
 
@@ -15,15 +16,15 @@ class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, max_action):
         super(Actor, self).__init__()
 
-        self.l1 = nn.Linear(state_dim, 400)
-        self.l2 = nn.Linear(400, 300)
-        self.l3 = nn.Linear(300, action_dim)
+        self.l1 = nn.Linear(state_dim, 256)
+        self.l2 = nn.Linear(256, 256)
+        self.l3 = nn.Linear(256, action_dim)
 
         self.max_action = max_action
 
     def forward(self, state):
-        a = torch.relu(self.l1(state))
-        a = torch.relu(self.l2(a))
+        a = F.relu(self.l1(state))
+        a = F.relu(self.l2(a))
         a = self.max_action * torch.tanh(self.l3(a))
         return a
     
@@ -32,32 +33,32 @@ class Critic(nn.Module):
         super(Critic, self).__init__()
 
         # Q1 architecture
-        self.l1 = nn.Linear(state_dim + action_dim, 400)
-        self.l2 = nn.Linear(400, 300)
-        self.l3 = nn.Linear(300, 1)
+        self.l1 = nn.Linear(state_dim + action_dim, 256)
+        self.l2 = nn.Linear(256, 256)
+        self.l3 = nn.Linear(256, 1)
 
         # Q2 architecture
-        self.l4 = nn.Linear(state_dim + action_dim, 400)
-        self.l5 = nn.Linear(400, 300)
-        self.l6 = nn.Linear(300, 1)
+        self.l4 = nn.Linear(state_dim + action_dim, 256)
+        self.l5 = nn.Linear(256, 256)
+        self.l6 = nn.Linear(256, 1)
 
     def forward(self, state, action):
         sa = torch.cat([state, action], 1)
 
-        q1 = torch.relu(self.l1(sa))
-        q1 = torch.relu(self.l2(q1))
+        q1 = F.relu(self.l1(sa))
+        q1 = F.relu(self.l2(q1))
         q1 = self.l3(q1)
 
-        q2 = torch.relu(self.l4(sa))
-        q2 = torch.relu(self.l5(q2))
+        q2 = F.relu(self.l4(sa))
+        q2 = F.relu(self.l5(q2))
         q2 = self.l6(q2)
         return q1, q2
     
     def Q1(self, state, action):
         sa = torch.cat([state, action], 1)
 
-        q1 = torch.relu(self.l1(sa))
-        q1 = torch.relu(self.l2(q1))
+        q1 = F.relu(self.l1(sa))
+        q1 = F.relu(self.l2(q1))
         q1 = self.l3(q1)
         return q1
 
@@ -144,19 +145,16 @@ if __name__ == '__main__':
     num_seeds = args.num_runs
     lr = 0.0003
     optimizer_eps = 1e-8
-    initial_epsilon = 1.0
-    final_epsilon = 0.001
-    epsilon_decay_steps = 12500
     buffer_size = 100000
     discount = 0.99
-    target_update_interval = 2
-    min_replay_size_before_updates = 1000
+    min_replay_size_before_updates = 25000
     minibatch_size = 256
     num_training_episodes = 1000
     policy_noise = 0.2
     noise_clip = 0.5
     policy_freq = 2
     tau = 0.005
+    exploration_noise = 0.1
 
     env = gym.make("Pendulum-v1")
     state_dim = env.observation_space.shape[0]
@@ -171,12 +169,11 @@ if __name__ == '__main__':
         critic = Critic(state_dim, action_dim)
         actor_optimizer = torch.optim.Adam(actor.parameters(), lr=lr, eps=optimizer_eps)
         critic_optimizer = torch.optim.Adam(critic.parameters(), lr=lr, eps=optimizer_eps)
-        explorer = epsilon_greedy_explorers.GaussianNoiseExplorer(std_dev=0.1*max_action, max_action=max_action)
+        explorer = epsilon_greedy_explorers.GaussianNoiseExplorer(std_dev=exploration_noise*max_action, max_action=max_action)
         buffer = replay_buffer.ReplayBuffer(buffer_size, discount=discount)
-        agent = td3.TD3(actor, actor_optimizer, critic, critic_optimizer, buffer, explorer, discount, 
-                        gradient_updates_per_target_refresh=target_update_interval, policy_noise=policy_noise*max_action, 
-                        noise_clip=noise_clip*max_action, policy_update_freq=policy_freq, minibatch_size=minibatch_size,
-                        min_replay_size_before_updates=min_replay_size_before_updates, tau=tau)
+        agent = td3.TD3(actor, actor_optimizer, critic, critic_optimizer, buffer, explorer, discount, policy_noise=policy_noise*max_action, 
+                        noise_clip=noise_clip*max_action, policy_update_frequency=policy_freq, minibatch_size=minibatch_size,
+                        min_replay_size_before_updates=min_replay_size_before_updates, tau=tau, max_action=max_action)
         episode_returns, q_values = agent_environment.agent_environment_episode_loop(agent, env, num_training_episodes, args.debug, args.track_q)
         all_returns.append(episode_returns)
         all_q_values.append(q_values)
