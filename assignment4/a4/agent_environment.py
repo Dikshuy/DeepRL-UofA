@@ -34,3 +34,33 @@ def agent_environment_episode_loop(agent, env, num_episodes, debug=False, track_
         return episode_returns, mean_q_predictions
     else:
         return episode_returns, None
+
+def agent_environment_step_loop(agent, env, num_steps, debug=False, track_q=False):
+    observation, info = env.reset()
+    episode_returns = []
+    episode_return = 0
+    episode_loss = 0
+    mean_q_predictions = [] # the average Q-value for all state-action pairs visited in the episode
+    for step in range(num_steps):
+        # start your code
+        action, q_values = agent.act(observation)
+        next_observation, reward, terminated, truncated, info = env.step(action)
+        loss = agent.process_transition(next_observation, reward, terminated, truncated)
+        episode_loss += loss
+        observation = next_observation
+        episode_return += reward
+        done = terminated or truncated
+        if track_q:
+            mean_q_predictions.append(q_values)
+        if done:
+            episode_returns.append(episode_return)
+            if debug:
+                print(f"Step: {step} - Return: {episode_return}")
+            episode_return = 0
+            episode_loss = 0
+            observation, info = env.reset()
+        # end your code
+    if track_q:   
+        return episode_returns, mean_q_predictions
+    else:
+        return episode_returns, None

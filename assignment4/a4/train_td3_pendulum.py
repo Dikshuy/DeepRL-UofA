@@ -145,11 +145,11 @@ if __name__ == '__main__':
     num_seeds = args.num_runs
     lr = 0.0003
     optimizer_eps = 1e-8
-    buffer_size = 100000
+    buffer_size = 1000000
     discount = 0.99
     min_replay_size_before_updates = 25000
     minibatch_size = 256
-    num_training_episodes = 1000
+    total_steps = 1000000
     policy_noise = 0.2
     noise_clip = 0.5
     policy_freq = 2
@@ -174,7 +174,7 @@ if __name__ == '__main__':
         agent = td3.TD3(actor, actor_optimizer, critic, critic_optimizer, buffer, explorer, discount, policy_noise=policy_noise*max_action, 
                         noise_clip=noise_clip*max_action, policy_update_frequency=policy_freq, minibatch_size=minibatch_size,
                         min_replay_size_before_updates=min_replay_size_before_updates, tau=tau, max_action=max_action)
-        episode_returns, q_values = agent_environment.agent_environment_episode_loop(agent, env, num_training_episodes, args.debug, args.track_q)
+        episode_returns, q_values = agent_environment.agent_environment_step_loop(agent, env, total_steps, args.debug, args.track_q)
         all_returns.append(episode_returns)
         all_q_values.append(q_values)
 
