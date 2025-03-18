@@ -1,12 +1,9 @@
 import numpy as np
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import copy
-import collections
 
-
-def soft_update(source, target, tau):
-    for source_param, target_param in zip(source.parameters(), target.parameters()):
-        target_param.data.copy_(tau * source_param.data + (1.0 - tau) * target_param.data)
 
 class TD3:
     """Class that implements TD3 algorithm."""
@@ -19,16 +16,13 @@ class TD3:
         replay_buffer,
         explorer,
         discount,
-        gradient_updates_per_target_refresh,
         policy_noise=0.2,
         noise_clip=0.5,
         policy_update_frequency=2,
-        gradient_update_frequency=1,
         input_preprocessor=lambda x: x,
         minibatch_size=32,
         min_replay_size_before_updates=32,
         tau = 0.005,
-        track_statistics=False,
         reward_phi=lambda reward: reward,
         max_action=1.0
     ):
@@ -43,16 +37,13 @@ class TD3:
         self.replay_buffer = replay_buffer
         self.explorer = explorer
         self.discount = discount
-        self.gradient_updates_per_target_refresh = gradient_updates_per_target_refresh
         self.policy_noise = policy_noise
         self.noise_clip = noise_clip
         self.policy_update_frequency = policy_update_frequency
-        self.gradient_update_frequency = gradient_update_frequency
         self.input_preprocessor = input_preprocessor
         self.minibatch_size = minibatch_size
         self.min_replay_size_before_updates = min_replay_size_before_updates
         self.tau = tau
-        self.track_statistics = track_statistics
         self.reward_phi = reward_phi
         self.max_action = max_action
  
@@ -76,9 +67,10 @@ class TD3:
         self.last_action = action
         return action, q_value
 
-    def compute_targets(self, batched_rewards, batched_next_states, batched_discounts, batch_terminated):
+    def compute_targets(self, batched_rewards, batched_actions, batched_next_states, batched_discounts, batch_terminated):
         with torch.no_grad():
-            noise = (torch.rand_like(batched_next_states[:, :self.actor_target(batched_next_states).size(1)])*self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
+            # noise = (torch.rand_like(batched_next_states[:, :self.actor_target(batched_next_states).size(1)])*self.policy_noise).clamp(-self.noise_clip, self.noise_clip) # check this
+            noise = (torch.randn_like(batched_actions)*self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
             next_actions = (self.actor_target(batched_next_states) + noise).clamp(-self.max_action, self.max_action)
             
             target_q1, target_q2 = self.critic_target(batched_next_states, next_actions)
@@ -88,6 +80,7 @@ class TD3:
         return targets
 
     def gradient_update(self):
+        self.gradient_updates += 1
         minibatch = self.replay_buffer.sample(self.minibatch_size)
         batched_states = torch.stack([transition['state'] for transition in minibatch])
         batched_actions = torch.tensor([transition['action'] for transition in minibatch]) 
@@ -96,13 +89,13 @@ class TD3:
         batched_discounts = torch.tensor([transition['discount'] for transition in minibatch])
         batch_terminated = torch.tensor([transition['terminated'] for transition in minibatch])
 
-        targets = self.compute_targets(batched_rewards, batched_next_states, batched_discounts, batch_terminated).float()
+        targets = self.compute_targets(batched_rewards, batched_actions, batched_next_states, batched_discounts, batch_terminated).float()
 
         current_q1, current_q2 = self.critic(batched_states, batched_actions)
         current_q1 = current_q1.squeeze(-1)
         current_q2 = current_q2.squeeze(-1)
 
-        critic_loss = torch.nn.functional.mse_loss(current_q1, targets) + torch.nn.functional.mse_loss(current_q2, targets)
+        critic_loss = F.mse_loss(current_q1, targets) + F.mse_loss(current_q2, targets)
 
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
@@ -110,17 +103,16 @@ class TD3:
 
         if self.gradient_updates % self.policy_update_frequency == 0:
             actor_loss = -self.critic.Q1(batched_states, self.actor(batched_states)).mean()
+            actor_loss = actor_loss.item()
 
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
             self.actor_optimizer.step()
 
-            if self.gradient_updates % self.gradient_updates_per_target_refresh == 0:
-                soft_update(self.actor, self.actor_target, self.tau)
-                soft_update(self.critic, self.critic_target, self.tau)
+            soft_update(self.actor, self.actor_target, self.tau)
+            soft_update(self.critic, self.critic_target, self.tau)
 
-        self.gradient_updates += 1
-        return critic_loss.item(), actor_loss.item()
+        return critic_loss.item(), actor_loss
 
     def process_transition(self, obs: int, reward: float, terminated: bool, truncated: bool) -> None:
         """Observe consequences of the last action and update estimates accordingly.
@@ -133,7 +125,7 @@ class TD3:
         if self.last_obs is not None and self.last_action is not None:
             self.replay_buffer.append(self.last_obs, self.last_action, reward, self.input_preprocessor(obs), int(terminated), int(truncated))
             self.total_steps += 1
-            if self.total_steps >= self.min_replay_size_before_updates and self.total_steps % self.gradient_update_frequency == 0:
+            if self.total_steps >= self.min_replay_size_before_updates:
                 loss = self.gradient_update()
                 self.episode_loss += loss
             
@@ -143,3 +135,7 @@ class TD3:
                 return episode_loss
             else:
                 return 0
+            
+def soft_update(source, target, tau):
+    for param, target_param in zip(source.parameters(), target.parameters()):
+        target_param.data.copy_(tau * param.data + (1.0 - tau) * target_param.data)
