@@ -97,42 +97,34 @@ def plot_alg_results(episode_returns_list, file, label="Algorithm", ylabel="Retu
     # Display the plot
     plt.savefig(file)
 
-
-def plot_many_algs(lists, labels, colors, file, ylabel="Return", title="Episodic Returns"):
-    # Define a function to calculate the running average
-
-    running_avgs = []
-    for i in range(len(lists)):
-        running_avgs.append(np.mean(np.array(lists[i]), axis=0))
-
-    # Create the plot
+# Adapted from Claude
+def plot_timestep_returns(returns_list, timesteps_list, file, env_name, title="Learning Curve"):
     plt.figure(figsize=(10, 6))
+    
+    # Determine the maximum number of timesteps
+    max_timesteps = max([ts[-1] for ts in timesteps_list])
 
-    # Plot the original data
-    # plt.plot(episode_rewards, marker='o', linestyle='-', color='b', label='Original Data')
+    # Create a common x-axis for interpolation
+    common_x = np.linspace(0, max_timesteps, 100)
+    interpolated_returns = []
+    for i, (returns, timesteps) in enumerate(zip(returns_list, timesteps_list)):
+        # Use numpy interpolation to get values at common timesteps
+        interpolated_y = np.interp(common_x, timesteps, returns)
+        interpolated_returns.append(interpolated_y)
+        
+        plt.plot(timesteps, returns, alpha=0.3, color='r', linestyle='-')
 
-    for i in range(len(lists)):
-        # Plot the running average
-        plt.plot(
-            range(0, len(running_avgs[i])),
-            running_avgs[i],
-            color=colors[i],
-            label=labels[i],
-        )
-
-    # Adding labels and title
-    plt.title(f"({CCID}){title}")
-    plt.xlabel("Episode")
-    plt.ylabel(ylabel)
-
-    # Add legend
+    # Calculate and plot the mean performance
+    mean_returns = np.mean(interpolated_returns, axis=0)
+    plt.plot(common_x, mean_returns, color='r', linewidth=2, label='Mean Return')
+    
+    plt.title(f"({CCID}) {title}")
+    plt.xlabel("Time Steps")
+    plt.ylabel("Average Return")
     plt.legend()
-
-    # Add grid
     plt.grid(True)
-
-    # Display the plot
     plt.savefig(file)
+    plt.close()
 
 
 if __name__ == '__main__':
@@ -140,6 +132,7 @@ if __name__ == '__main__':
     parser.add_argument("--debug", action="store_true", default=False)
     parser.add_argument("--track-q", action="store_true", default=False)
     parser.add_argument("--num-runs", type=int, default=5)
+    parser.add_argument("--total-steps", type=int, default=1000000)
     args = parser.parse_args()
 
     num_seeds = args.num_runs
@@ -149,33 +142,50 @@ if __name__ == '__main__':
     discount = 0.99
     min_replay_size_before_updates = 25000
     minibatch_size = 256
-    total_steps = 1000000
+    total_steps = args.total_steps
     policy_noise = 0.2
     noise_clip = 0.5
     policy_freq = 2
     tau = 0.005
     exploration_noise = 0.1
 
-    env = gym.make("Pendulum-v1")
-    state_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.shape[0]
-    max_action = float(env.action_space.high[0])
+    environments = [
+        "Ant-v4",
+        "Walker2d-v4",
+        "MountainCarContinuous-v0",
+        "Reacher-v4",
+        "InvertedPendulum-v4"
+    ]
 
-    all_returns = []
-    all_q_values = []
+    for env_name in environments:
+        print(f"\n==== Training TD3 on {env_name} ====")
+        env = gym.make(env_name)
+        state_dim = env.observation_space.shape[0]
+        action_dim = env.action_space.shape[0]
+        max_action = float(env.action_space.high[0])
 
-    for seed in range(num_seeds):
-        actor = Actor(state_dim, action_dim, max_action)
-        critic = Critic(state_dim, action_dim)
-        actor_optimizer = torch.optim.Adam(actor.parameters(), lr=lr, eps=optimizer_eps)
-        critic_optimizer = torch.optim.Adam(critic.parameters(), lr=lr, eps=optimizer_eps)
-        explorer = epsilon_greedy_explorers.GaussianNoiseExplorer(std_dev=exploration_noise*max_action, max_action=max_action)
-        buffer = replay_buffer.ReplayBuffer(buffer_size, discount=discount)
-        agent = td3.TD3(actor, actor_optimizer, critic, critic_optimizer, buffer, explorer, discount, policy_noise=policy_noise*max_action, 
-                        noise_clip=noise_clip*max_action, policy_update_frequency=policy_freq, minibatch_size=minibatch_size,
-                        min_replay_size_before_updates=min_replay_size_before_updates, tau=tau, max_action=max_action)
-        episode_returns, q_values = agent_environment.agent_environment_step_loop(agent, env, total_steps, args.debug, args.track_q)
-        all_returns.append(episode_returns)
-        all_q_values.append(q_values)
+        all_returns = []
+        all_timesteps = []
+        all_q_values = []
 
-    plot_alg_results(all_returns, f"td3_pendulum.png", label="TD3")
+        for seed in range(num_seeds):
+            print(f"running seed: {seed}")
+            actor = Actor(state_dim, action_dim, max_action)
+            critic = Critic(state_dim, action_dim)
+            actor_optimizer = torch.optim.Adam(actor.parameters(), lr=lr, eps=optimizer_eps)
+            critic_optimizer = torch.optim.Adam(critic.parameters(), lr=lr, eps=optimizer_eps)
+            explorer = epsilon_greedy_explorers.GaussianNoiseExplorer(std_dev=exploration_noise*max_action, max_action=max_action)
+            buffer = replay_buffer.ReplayBuffer(buffer_size, discount=discount)
+            agent = td3.TD3(actor, actor_optimizer, critic, critic_optimizer, buffer, explorer, discount, policy_noise=policy_noise*max_action, 
+                            noise_clip=noise_clip*max_action, policy_update_frequency=policy_freq, minibatch_size=minibatch_size,
+                            min_replay_size_before_updates=min_replay_size_before_updates, tau=tau, max_action=max_action)
+            episode_returns, episode_timesteps, q_values = agent_environment.agent_environment_step_loop(agent, env, total_steps, args.debug, args.track_q)
+            all_returns.append(episode_returns)
+            all_timesteps.append(episode_timesteps)
+            all_q_values.append(q_values)
+
+        timesteps_list = []
+        for timesteps in all_timesteps:
+            timesteps_list.append(np.array(timesteps))
+
+        plot_timestep_returns(all_returns, timesteps_list,f"td3_{env_name.lower().replace('-', '_')}.png", env_name, title=f"TD3 Performance on {env_name}")
