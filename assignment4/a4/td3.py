@@ -82,13 +82,13 @@ class TD3:
     def gradient_update(self):
         self.gradient_updates += 1
         minibatch = self.replay_buffer.sample(self.minibatch_size)
-        batched_states = torch.stack([transition['state'] for transition in minibatch])
-        batched_actions = torch.tensor([transition['action'] for transition in minibatch]) 
-        batched_rewards = torch.tensor([transition['reward'] for transition in minibatch])
-        batched_next_states = torch.stack([transition['next_state'] for transition in minibatch])
-        batched_discounts = torch.tensor([transition['discount'] for transition in minibatch])
-        batch_terminated = torch.tensor([transition['terminated'] for transition in minibatch])
-
+        batched_states = torch.stack([torch.tensor(transition['state'], dtype=torch.float32) for transition in minibatch])
+        batched_actions = torch.tensor(np.array([transition['action'] for transition in minibatch]), dtype=torch.float32)
+        batched_rewards = torch.tensor(np.array([transition['reward'] for transition in minibatch]), dtype=torch.float32)
+        batched_next_states = torch.stack([torch.tensor(transition['next_state'], dtype=torch.float32) for transition in minibatch])
+        batched_discounts = torch.tensor(np.array([transition['discount'] for transition in minibatch]), dtype=torch.float32)
+        batch_terminated = torch.tensor(np.array([transition['terminated'] for transition in minibatch]), dtype=torch.float32)
+    
         targets = self.compute_targets(batched_rewards, batched_actions, batched_next_states, batched_discounts, batch_terminated).float()
 
         current_q1, current_q2 = self.critic(batched_states, batched_actions)
@@ -103,7 +103,6 @@ class TD3:
 
         if self.gradient_updates % self.policy_update_frequency == 0:
             actor_loss = -self.critic.Q1(batched_states, self.actor(batched_states)).mean()
-            actor_loss = actor_loss.item()
 
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
@@ -112,7 +111,7 @@ class TD3:
             soft_update(self.actor, self.actor_target, self.tau)
             soft_update(self.critic, self.critic_target, self.tau)
 
-        return critic_loss.item(), actor_loss
+        return critic_loss.item()
 
     def process_transition(self, obs: int, reward: float, terminated: bool, truncated: bool) -> None:
         """Observe consequences of the last action and update estimates accordingly.
