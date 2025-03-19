@@ -69,7 +69,6 @@ class TD3:
 
     def compute_targets(self, batched_rewards, batched_actions, batched_next_states, batched_discounts, batch_terminated):
         with torch.no_grad():
-            # noise = (torch.rand_like(batched_next_states[:, :self.actor_target(batched_next_states).size(1)])*self.policy_noise).clamp(-self.noise_clip, self.noise_clip) # check this
             noise = (torch.randn_like(batched_actions)*self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
             next_actions = (self.actor_target(batched_next_states) + noise).clamp(-self.max_action, self.max_action)
             
@@ -82,10 +81,10 @@ class TD3:
     def gradient_update(self):
         self.gradient_updates += 1
         minibatch = self.replay_buffer.sample(self.minibatch_size)
-        batched_states = torch.stack([torch.tensor(transition['state'], dtype=torch.float32) for transition in minibatch])
+        batched_states = torch.stack([x['state'].clone().detach() if isinstance(x['state'], torch.Tensor) else torch.tensor(x['state'], dtype=torch.float32) for x in minibatch])
         batched_actions = torch.tensor(np.array([transition['action'] for transition in minibatch]), dtype=torch.float32)
         batched_rewards = torch.tensor(np.array([transition['reward'] for transition in minibatch]), dtype=torch.float32)
-        batched_next_states = torch.stack([torch.tensor(transition['next_state'], dtype=torch.float32) for transition in minibatch])
+        batched_next_states = torch.stack([x['next_state'].clone().detach() if isinstance(x['next_state'], torch.Tensor) else torch.tensor(x['next_state'], dtype=torch.float32) for x in minibatch])
         batched_discounts = torch.tensor(np.array([transition['discount'] for transition in minibatch]), dtype=torch.float32)
         batch_terminated = torch.tensor(np.array([transition['terminated'] for transition in minibatch]), dtype=torch.float32)
     
