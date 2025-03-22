@@ -45,7 +45,7 @@ echo "Seed: $SEED"
 
 mkdir -p "$OUTPUT_DIR/$ENV"
 
-python td3_ablation.py \\
+python td3_ablations.py \\
     --env "$ENV" \\
     --config-name "$CONFIG_NAME" \\
     --seed $SEED \\
@@ -65,5 +65,6 @@ EOL
             echo "Generated and submitted: $script_name"
         done
     done
+done
 
 echo "All scripts created and submitted!"
