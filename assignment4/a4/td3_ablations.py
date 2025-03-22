@@ -9,6 +9,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import replay_buffer
 import argparse
+import os
+import json
 
 CCID="ddikshan"
 
@@ -68,20 +70,16 @@ class Critic(nn.Module):
         return q1
 
 class ModifiedTD3(td3.TD3):
-    def __init__(self, actor, actor_optimizer, critic, critic_optimizer, replay_buffer, explorer, discount, policy_noise=0.2, noise_clip=0.5, policy_update_frequency=2, input_preprocessor=lambda x:x, minibatch_size=32, min_replay_size_before_updates=32, tau=0.005, reward_phi=lambda reward: reward, max_action=1, use_two_q=True, use_target_smoothing=True):
+    def __init__(self, actor, actor_optimizer, critic, critic_optimizer, replay_buffer, explorer, discount, policy_noise=0.2, noise_clip=0.5, policy_update_frequency=2, input_preprocessor=lambda x:x, minibatch_size=32, min_replay_size_before_updates=32, tau=0.005, reward_phi=lambda reward: reward, max_action=1, use_two_q=True):
         super().__init__(actor, actor_optimizer, critic, critic_optimizer, replay_buffer, explorer, discount, policy_noise, noise_clip, policy_update_frequency, input_preprocessor, minibatch_size, min_replay_size_before_updates, tau, reward_phi, max_action)
 
         self.use_two_q = use_two_q
-        self.use_target_smoothing = use_target_smoothing
 
     def compute_targets(self, batched_rewards, batched_actions, batched_next_states, batched_discounts, batch_terminated):
         with torch.no_grad():
-            if self.use_target_smoothing:
-                noise = (torch.randn_like(batched_actions)*self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
-                next_actions = (self.actor_target(batched_next_states) + noise).clamp(-self.max_action, self.max_action)
-            else:
-                next_actions = self.actor_target(batched_next_states).clamp(-self.max_action, self.max_action)
-
+            noise = (torch.randn_like(batched_actions)*self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
+            next_actions = (self.actor_target(batched_next_states) + noise).clamp(-self.max_action, self.max_action)
+            
             target_q1, target_q2 = self.critic_target(batched_next_states, next_actions)
             
             if self.use_two_q:
@@ -92,23 +90,41 @@ class ModifiedTD3(td3.TD3):
             target_q = batched_rewards + (1 - batch_terminated) * batched_discounts * target_q
         return target_q
 
-def plot_comparison(env_name, results):
+def plot_grouped_configs(env_name, results_dir, group_name, configs_to_plot, filename_suffix):
     plt.figure(figsize=(12, 8))
     
-    colors = ['r', 'b', 'g', 'c', 'm']
+    colors = ['r', 'b', 'g', 'c', 'm', 'y']
     
+    results = {}
     max_timestep = 0
-    for config_name, data in results.items():
-        for timesteps in data["timesteps"]:
-            if timesteps[-1] > max_timestep:
-                max_timestep = timesteps[-1]
+    
+    for config_name in configs_to_plot:
+        config_folder = os.path.join(results_dir, config_name.replace(" ", "_").replace("(", "").replace(")", ""))
+        results[config_name] = {"returns": [], "timesteps": []}
+        
+        for seed_file in os.listdir(config_folder):
+            if seed_file.endswith(".json"):
+                with open(os.path.join(config_folder, seed_file), 'r') as f:
+                    seed_data = json.load(f)
+                    results[config_name]["returns"].append(seed_data["returns"])
+                    results[config_name]["timesteps"].append(seed_data["timesteps"])
+                    
+                    if seed_data["timesteps"][-1] > max_timestep:
+                        max_timestep = seed_data["timesteps"][-1]
+    
+    if not results:
+        print(f"No results found for the specified configurations: {configs_to_plot}")
+        return
     
     common_x = np.linspace(0, max_timestep, 100)
-    
-    for i, (config_name, data) in enumerate(results.items()):
+    for i, config_name in enumerate(configs_to_plot):
+        if config_name not in results:
+            continue
+            
+        data = results[config_name]
         color = colors[i % len(colors)]
         for returns, timesteps in zip(data["returns"], data["timesteps"]):
-            plt.plot(timesteps, returns, alpha=0.2, color=color)
+            plt.plot(timesteps, returns, alpha=0.3, color=color)
         
         interpolated_returns = []
         for returns, timesteps in zip(data["returns"], data["timesteps"]):
@@ -118,64 +134,21 @@ def plot_comparison(env_name, results):
         mean_returns = np.mean(interpolated_returns, axis=0)
         plt.plot(common_x, mean_returns, color=color, linewidth=2, label=config_name)
     
-    plt.title(f"({CCID}) TD3 Ablation Study on {env_name}")
+    plt.title(f"({CCID}) TD3 Ablation Study - {group_name} on {env_name}")
     plt.xlabel("Time Steps")
     plt.ylabel("Average Return")
     plt.legend()
     plt.grid(True)
-    plt.savefig(f"td3_ablation_returns_{env_name.lower().replace('-', '_')}.png")
-    
-    plt.figure(figsize=(12, 8))
-    for i, (config_name, data) in enumerate(results.items()):
-        color = colors[i % len(colors)]
-        all_q = []
-        for q_values in data["q_values"]:
-            if q_values:
-                all_q.extend(q_values)
-        
-        if all_q:
-            window_size = 1000
-            q_windows = [np.mean(all_q[i:i+window_size]) for i in range(0, len(all_q), window_size)]
-            plt.plot(range(0, len(q_windows)*window_size, window_size), q_windows, color=color, linewidth=2, label=config_name)
-    
-    plt.title(f"({CCID}) TD3 Q-Value Estimation on {env_name}")
-    plt.xlabel("Training Steps")
-    plt.ylabel("Average Q-Value")
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(f"td3_q_values_{env_name.lower().replace('-', '_')}.png")
-
-# Adapted from Claude
-def plot_timestep_returns(returns_list, timesteps_list, file, env_name, title="Learning Curve"):
-    plt.figure(figsize=(10, 6))
-    
-    # Determine the maximum number of timesteps
-    max_timesteps = max([ts[-1] for ts in timesteps_list])
-
-    # Create a common x-axis for interpolation
-    common_x = np.linspace(0, max_timesteps, 100)
-    interpolated_returns = []
-    for i, (returns, timesteps) in enumerate(zip(returns_list, timesteps_list)):
-        # Use numpy interpolation to get values at common timesteps
-        interpolated_y = np.interp(common_x, timesteps, returns)
-        interpolated_returns.append(interpolated_y)
-        
-        plt.plot(timesteps, returns, alpha=0.3, color='r', linestyle='-')
-
-    # Calculate and plot the mean performance
-    mean_returns = np.mean(interpolated_returns, axis=0)
-    plt.plot(common_x, mean_returns, color='r', linewidth=2, label='Mean Return')
-    
-    plt.title(f"({CCID}) {title}")
-    plt.xlabel("Time Steps")
-    plt.ylabel("Average Return")
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(file)
+    plt.savefig(os.path.join(results_dir, f"td3_ablation_{env_name.lower().replace('-', '_')}_{filename_suffix}.png"))
     plt.close()
 
-def run_experiments(env_name, num_seeds=5, total_steps=1000000):
+def run_single_config(env_name, config, seed, total_steps, output_dir):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+  
     env = gym.make(env_name)
+    env.reset(seed=seed)
+    
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
     max_action = float(env.action_space.high[0])
@@ -187,65 +160,118 @@ def run_experiments(env_name, num_seeds=5, total_steps=1000000):
     discount = 0.99
     min_replay_size_before_updates = 25000
     minibatch_size = 256
-    total_steps = args.total_steps
-    policy_noise = 0.2
     noise_clip = 0.5
-    policy_freq = 2
     tau = 0.005
     exploration_noise = 0.1
+    
+    actor = Actor(state_dim, action_dim, max_action)
+    critic = Critic(state_dim, action_dim, use_two_q=config['use_twin_critics'])
+    actor_optimizer = torch.optim.Adam(actor.parameters(), lr=lr, eps=optimizer_eps)
+    critic_optimizer = torch.optim.Adam(critic.parameters(), lr=lr, eps=optimizer_eps)
+    explorer = epsilon_greedy_explorers.GaussianNoiseExplorer(std_dev=exploration_noise*max_action, max_action=max_action)
+    buffer = replay_buffer.ReplayBuffer(buffer_size, discount=discount)
+    agent = ModifiedTD3(actor, actor_optimizer, critic, critic_optimizer, buffer, explorer, discount, 
+                        policy_noise=config["policy_noise"] * max_action, 
+                        noise_clip=noise_clip, 
+                        policy_update_frequency=config["policy_freq"], 
+                        minibatch_size=minibatch_size,
+                        min_replay_size_before_updates=min_replay_size_before_updates, 
+                        tau=tau, 
+                        max_action=max_action, 
+                        use_two_q=config['use_twin_critics'])
+    
+    print(f"Training {config['name']} with seed {seed} on {env_name}")
+    episode_returns, episode_timesteps, q_values = agent_environment.agent_environment_step_loop(agent, env, total_steps, debug=False, track_q=True)
+    
+    config_folder = os.path.join(output_dir, config['name'].replace(" ", "_").replace("(", "").replace(")", ""))
+    os.makedirs(config_folder, exist_ok=True)
+    
+    result = {
+        "returns": episode_returns,
+        "timesteps": episode_timesteps,
+        "q_values": q_values,
+        "config": config,
+        "seed": seed
+    }
+    
+    with open(os.path.join(config_folder, f"seed_{seed}.json"), 'w') as f:
+        json.dump(result, f)
+        
+    return config['name'], seed
 
-    results = {}
-
-    configurations = [
-        {"name": "TD3 (Twin Critics)", "use_twin_critics": True, "use_target_smoothing": True},
-        {"name": "TD3 (Single Critic)", "use_twin_critics": False, "use_target_smoothing": True}
+def create_plots(env_name, results_dir):    
+    # 1. Twin Critics vs Single Critic
+    plot_grouped_configs(
+        env_name, 
+        results_dir, 
+        "Twin Critics vs Single Critic", 
+        ["TD3 (Default)", "TD3 (Single Critic)"], 
+        "critics_comparison"
+    )
+    
+    # 2. Delayed Updates Comparison
+    plot_grouped_configs(
+        env_name, 
+        results_dir, 
+        "Policy Update Frequency", 
+        ["TD3 (Default)", "TD3 (No Delayed Updates)", "TD3 (More Delayed Updates)"], 
+        "policy_update_frequency"
+    )
+    
+    # 3. Policy Noise Comparison
+    plot_grouped_configs(
+        env_name, 
+        results_dir, 
+        "Policy Noise", 
+        ["TD3 (Default)", "TD3 (No policy noise)", "TD3 (More policy noise)"], 
+        "policy_noise"
+    )
+    
+    # 4. All configs combined
+    all_configs = [
+        "TD3 (Default)",
+        "TD3 (Single Critic)",
+        "TD3 (No Delayed Updates)",
+        "TD3 (More Delayed Updates)",
+        "TD3 (No policy noise)",
+        "TD3 (More policy noise)"
     ]
-
-    for config in configurations:
-        print(f"\n==== Training {config['name']} on {env_name} ====")
-
-        all_returns = []
-        all_timesteps = []
-        all_q_values = []
-
-        for seed in range(num_seeds):
-            print(f"running seed: {seed}")
-            actor = Actor(state_dim, action_dim, max_action)
-            critic = Critic(state_dim, action_dim, use_two_q=config['use_twin_critics'])
-            actor_optimizer = torch.optim.Adam(actor.parameters(), lr=lr, eps=optimizer_eps)
-            critic_optimizer = torch.optim.Adam(critic.parameters(), lr=lr, eps=optimizer_eps)
-            explorer = epsilon_greedy_explorers.GaussianNoiseExplorer(std_dev=exploration_noise*max_action, max_action=max_action)
-            buffer = replay_buffer.ReplayBuffer(buffer_size, discount=discount)
-            agent = ModifiedTD3(actor, actor_optimizer, critic, critic_optimizer, buffer, explorer, discount, policy_noise=policy_noise*max_action, 
-                                noise_clip=noise_clip*max_action, policy_update_frequency=policy_freq, minibatch_size=minibatch_size,
-                                min_replay_size_before_updates=min_replay_size_before_updates, tau=tau, max_action=max_action, use_two_q=config['use_twin_critics'], use_target_smoothing=config['use_target_smoothing'])
-            
-            episode_returns, episode_timesteps, q_values = agent_environment.agent_environment_step_loop(agent, env, total_steps, debug=True, track_q=True)
-            all_returns.append(episode_returns)
-            all_timesteps.append(episode_timesteps)
-            all_q_values.append(q_values)
-
-        results[config["name"]] = {
-            "returns": all_returns,
-            "timesteps": all_timesteps,
-            "q_values": all_q_values
-        }
-
-    plot_comparison(env_name, results)
-
+    
+    plot_grouped_configs(
+        env_name, 
+        results_dir, 
+        "All Configurations", 
+        all_configs, 
+        "all_configs"
+    )
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--debug", action="store_true", default=False)
-    parser.add_argument("--track-q", action="store_true", default=False)
-    parser.add_argument("--num-runs", type=int, default=3)
     parser.add_argument("--total-steps", type=int, default=1000000)
+    parser.add_argument("--env", type=str, required=True, help="Environment name")
+    parser.add_argument("--config-name", type=str, required=True, help="Configuration name")
+    parser.add_argument("--seed", type=int, required=True, help="Random seed")
+    parser.add_argument("--total-steps", type=int, default=1000000, help="Total steps to train")
+    parser.add_argument("--output-dir", type=str, default="results", help="Output directory for results")
+    parser.add_argument("--use-twin-critics", type=int, default=1, help="1 for twin critics, 0 for single critic")
+    parser.add_argument("--debug", action="store_true", default=False, help="Track returns")
+    parser.add_argument("--track-q", action="store_true", default=False, help="Track Q-values")
+    parser.add_argument("--policy-freq", type=int, default=2, help="Policy update frequency")
+    parser.add_argument("--policy-noise", type=float, default=0.2, help="Policy noise")
+    parser.add_argument("--plot-only", action="store_true", help="Only create plots from existing results")
+    args = parser.parse_args()
     args = parser.parse_args()
 
-    environments = [
-        "Ant-v4",
-        "Walker2d-v4"
-    ]
-
-    for env_name in environments:
-        run_experiments(env_name, args.num_runs, args.total_steps)
+    if args.plot_only:
+        print(f"Creating plots from results in {args.output_dir}")
+        create_plots(args.env, args.output_dir)
+    else:
+        config = {
+            "name": args.config_name,
+            "use_twin_critics": args.use_twin_critics == 1,
+            "policy_freq": args.policy_freq,
+            "policy_noise": args.policy_noise
+        }
+        
+        os.makedirs(args.output_dir, exist_ok=True)
+        run_single_config(args.env, config, args.seed, args.total_steps, args.output_dir)
