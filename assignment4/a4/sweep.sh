@@ -34,9 +34,10 @@ for ENV in "${ENVS[@]}"; do
 #!/bin/bash
 #SBATCH --account=def-mtaylor3_cpu
 #SBATCH --mem-per-cpu=8G
-#SBATCH --time=24:00:00
+#SBATCH --time=44:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
+#SBATCH --gres=gpu:1
 
 echo "Running TD3 Ablation Experiment..."
 echo "Environment: $ENV"
