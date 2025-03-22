@@ -247,15 +247,14 @@ def create_plots(env_name, results_dir):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--total-steps", type=int, default=1000000)
     parser.add_argument("--env", type=str, required=True, help="Environment name")
     parser.add_argument("--config-name", type=str, required=True, help="Configuration name")
     parser.add_argument("--seed", type=int, required=True, help="Random seed")
     parser.add_argument("--total-steps", type=int, default=1000000, help="Total steps to train")
     parser.add_argument("--output-dir", type=str, default="results", help="Output directory for results")
     parser.add_argument("--use-twin-critics", type=int, default=1, help="1 for twin critics, 0 for single critic")
-    parser.add_argument("--debug", action="store_true", default=False, help="Track returns")
-    parser.add_argument("--track-q", action="store_true", default=False, help="Track Q-values")
+    parser.add_argument("--debug", action="store_true", default=True, help="Track returns")
+    parser.add_argument("--track-q", action="store_true", default=True, help="Track Q-values")
     parser.add_argument("--policy-freq", type=int, default=2, help="Policy update frequency")
     parser.add_argument("--policy-noise", type=float, default=0.2, help="Policy noise")
     parser.add_argument("--plot-only", action="store_true", help="Only create plots from existing results")
