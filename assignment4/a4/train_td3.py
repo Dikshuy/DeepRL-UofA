@@ -135,6 +135,9 @@ if __name__ == '__main__':
     parser.add_argument("--total-steps", type=int, default=1000000)
     args = parser.parse_args()
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
     num_seeds = args.num_runs
     lr = 0.0003
     optimizer_eps = 1e-8
@@ -170,6 +173,12 @@ if __name__ == '__main__':
 
         for seed in range(num_seeds):
             print(f"running seed: {seed}")
+            
+            torch.manual_seed(seed)
+            np.random.seed(seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed(seed)
+            
             actor = Actor(state_dim, action_dim, max_action)
             critic = Critic(state_dim, action_dim)
             actor_optimizer = torch.optim.Adam(actor.parameters(), lr=lr, eps=optimizer_eps)
@@ -178,7 +187,7 @@ if __name__ == '__main__':
             buffer = replay_buffer.ReplayBuffer(buffer_size, discount=discount)
             agent = td3.TD3(actor, actor_optimizer, critic, critic_optimizer, buffer, explorer, discount, policy_noise=policy_noise*max_action, 
                             noise_clip=noise_clip*max_action, policy_update_frequency=policy_freq, minibatch_size=minibatch_size,
-                            min_replay_size_before_updates=min_replay_size_before_updates, tau=tau, max_action=max_action)
+                            min_replay_size_before_updates=min_replay_size_before_updates, tau=tau, max_action=max_action, device=device)
             episode_returns, episode_timesteps, q_values = agent_environment.agent_environment_step_loop(agent, env, total_steps, args.debug, args.track_q)
             all_returns.append(episode_returns)
             all_timesteps.append(episode_timesteps)

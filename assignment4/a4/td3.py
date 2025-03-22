@@ -22,17 +22,20 @@ class TD3:
         input_preprocessor=lambda x: x,
         minibatch_size=32,
         min_replay_size_before_updates=32,
-        tau = 0.005,
+        tau=0.005,
         reward_phi=lambda reward: reward,
-        max_action=1.0
+        max_action=1.0,
+        device=None
     ):
-        self.actor = actor
+        self.device = device if device is not None else torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
+        self.actor = actor.to(self.device)
         self.actor_optimizer = actor_optimizer
-        self.actor_target = copy.deepcopy(actor)
+        self.actor_target = copy.deepcopy(actor).to(self.device)
 
-        self.critic = critic
+        self.critic = critic.to(self.device)
         self.critic_optimizer = critic_optimizer
-        self.critic_target = copy.deepcopy(critic)
+        self.critic_target = copy.deepcopy(critic).to(self.device)
 
         self.replay_buffer = replay_buffer
         self.explorer = explorer
@@ -57,19 +60,19 @@ class TD3:
         """Returns an action and its q-value 
         """
         obs = self.input_preprocessor(obs)
-        obs = torch.tensor(obs, dtype=torch.float32)
+        obs = torch.tensor(obs, dtype=torch.float32).to(self.device)
         with torch.no_grad():
-            action_vals = self.actor(obs).detach().numpy()
+            action_vals = self.actor(obs).cpu().detach().numpy()
             action = self.explorer.select_action(action_vals)
             action = np.clip(action, -self.max_action, self.max_action)
-            q_value = self.critic.Q1(obs.unsqueeze(0), torch.tensor(action, dtype=torch.float32).unsqueeze(0)).item()
+            q_value = self.critic.Q1(obs.unsqueeze(0), torch.tensor(action, dtype=torch.float32).unsqueeze(0).to(self.device)).cpu().item()
         self.last_obs = obs
         self.last_action = action
         return action, q_value
 
     def compute_targets(self, batched_rewards, batched_actions, batched_next_states, batched_discounts, batch_terminated):
         with torch.no_grad():
-            noise = (torch.randn_like(batched_actions)*self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
+            noise = (torch.randn_like(batched_actions, device=self.device)*self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
             next_actions = (self.actor_target(batched_next_states) + noise).clamp(-self.max_action, self.max_action)
             
             target_q1, target_q2 = self.critic_target(batched_next_states, next_actions)
@@ -81,12 +84,12 @@ class TD3:
     def gradient_update(self):
         self.gradient_updates += 1
         minibatch = self.replay_buffer.sample(self.minibatch_size)
-        batched_states = torch.stack([x['state'].clone().detach() if isinstance(x['state'], torch.Tensor) else torch.tensor(x['state'], dtype=torch.float32) for x in minibatch])
-        batched_actions = torch.tensor(np.array([transition['action'] for transition in minibatch]), dtype=torch.float32)
-        batched_rewards = torch.tensor(np.array([transition['reward'] for transition in minibatch]), dtype=torch.float32)
-        batched_next_states = torch.stack([x['next_state'].clone().detach() if isinstance(x['next_state'], torch.Tensor) else torch.tensor(x['next_state'], dtype=torch.float32) for x in minibatch])
-        batched_discounts = torch.tensor(np.array([transition['discount'] for transition in minibatch]), dtype=torch.float32)
-        batch_terminated = torch.tensor(np.array([transition['terminated'] for transition in minibatch]), dtype=torch.float32)
+        batched_states = torch.stack([x['state'].clone().detach() if isinstance(x['state'], torch.Tensor) else torch.tensor(x['state'], dtype=torch.float32) for x in minibatch]).to(self.device)
+        batched_actions = torch.tensor(np.array([transition['action'] for transition in minibatch]), dtype=torch.float32).to(self.device)
+        batched_rewards = torch.tensor(np.array([transition['reward'] for transition in minibatch]), dtype=torch.float32).to(self.device)
+        batched_next_states = torch.stack([x['next_state'].clone().detach() if isinstance(x['next_state'], torch.Tensor) else torch.tensor(x['next_state'], dtype=torch.float32) for x in minibatch]).to(self.device)
+        batched_discounts = torch.tensor(np.array([transition['discount'] for transition in minibatch]), dtype=torch.float32).to(self.device)
+        batch_terminated = torch.tensor(np.array([transition['terminated'] for transition in minibatch]), dtype=torch.float32).to(self.device)
     
         targets = self.compute_targets(batched_rewards, batched_actions, batched_next_states, batched_discounts, batch_terminated).float()
 
@@ -121,7 +124,9 @@ class TD3:
         reward = self.reward_phi(reward)
 
         if self.last_obs is not None and self.last_action is not None:
-            self.replay_buffer.append(self.last_obs, self.last_action, reward, self.input_preprocessor(obs), int(terminated), int(truncated))
+            cpu_last_obs = self.last_obs.cpu() if isinstance(self.last_obs, torch.Tensor) else self.last_obs
+            processed_obs = self.input_preprocessor(obs)
+            self.replay_buffer.append(cpu_last_obs, self.last_action, reward, processed_obs, int(terminated), int(truncated))
             self.total_steps += 1
             if self.total_steps >= self.min_replay_size_before_updates:
                 loss = self.gradient_update()

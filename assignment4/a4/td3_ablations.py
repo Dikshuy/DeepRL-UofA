@@ -70,8 +70,8 @@ class Critic(nn.Module):
         return q1
 
 class ModifiedTD3(td3.TD3):
-    def __init__(self, actor, actor_optimizer, critic, critic_optimizer, replay_buffer, explorer, discount, policy_noise=0.2, noise_clip=0.5, policy_update_frequency=2, input_preprocessor=lambda x:x, minibatch_size=32, min_replay_size_before_updates=32, tau=0.005, reward_phi=lambda reward: reward, max_action=1, use_two_q=True):
-        super().__init__(actor, actor_optimizer, critic, critic_optimizer, replay_buffer, explorer, discount, policy_noise, noise_clip, policy_update_frequency, input_preprocessor, minibatch_size, min_replay_size_before_updates, tau, reward_phi, max_action)
+    def __init__(self, actor, actor_optimizer, critic, critic_optimizer, replay_buffer, explorer, discount, policy_noise=0.2, noise_clip=0.5, policy_update_frequency=2, input_preprocessor=lambda x:x, minibatch_size=32, min_replay_size_before_updates=32, tau=0.005, reward_phi=lambda reward: reward, max_action=1, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"), use_two_q=True):
+        super().__init__(actor, actor_optimizer, critic, critic_optimizer, replay_buffer, explorer, discount, policy_noise, noise_clip, policy_update_frequency, input_preprocessor, minibatch_size, min_replay_size_before_updates, tau, reward_phi, max_action, device)
 
         self.use_two_q = use_two_q
 
@@ -90,61 +90,11 @@ class ModifiedTD3(td3.TD3):
             target_q = batched_rewards + (1 - batch_terminated) * batched_discounts * target_q
         return target_q
 
-def plot_grouped_configs(env_name, results_dir, group_name, configs_to_plot, filename_suffix):
-    plt.figure(figsize=(12, 8))
-    
-    colors = ['r', 'b', 'g', 'c', 'm', 'y']
-    
-    results = {}
-    max_timestep = 0
-    
-    for config_name in configs_to_plot:
-        config_folder = os.path.join(results_dir, config_name.replace(" ", "_").replace("(", "").replace(")", ""))
-        results[config_name] = {"returns": [], "timesteps": []}
-        
-        for seed_file in os.listdir(config_folder):
-            if seed_file.endswith(".json"):
-                with open(os.path.join(config_folder, seed_file), 'r') as f:
-                    seed_data = json.load(f)
-                    results[config_name]["returns"].append(seed_data["returns"])
-                    results[config_name]["timesteps"].append(seed_data["timesteps"])
-                    
-                    if seed_data["timesteps"][-1] > max_timestep:
-                        max_timestep = seed_data["timesteps"][-1]
-    
-    if not results:
-        print(f"No results found for the specified configurations: {configs_to_plot}")
-        return
-    
-    common_x = np.linspace(0, max_timestep, 100)
-    for i, config_name in enumerate(configs_to_plot):
-        if config_name not in results:
-            continue
-            
-        data = results[config_name]
-        color = colors[i % len(colors)]
-        for returns, timesteps in zip(data["returns"], data["timesteps"]):
-            plt.plot(timesteps, returns, alpha=0.3, color=color)
-        
-        interpolated_returns = []
-        for returns, timesteps in zip(data["returns"], data["timesteps"]):
-            interpolated_y = np.interp(common_x, timesteps, returns)
-            interpolated_returns.append(interpolated_y)
-        
-        mean_returns = np.mean(interpolated_returns, axis=0)
-        plt.plot(common_x, mean_returns, color=color, linewidth=2, label=config_name)
-    
-    plt.title(f"({CCID}) TD3 Ablation Study - {group_name} on {env_name}")
-    plt.xlabel("Time Steps")
-    plt.ylabel("Average Return")
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(os.path.join(results_dir, f"td3_ablation_{env_name.lower().replace('-', '_')}_{filename_suffix}.png"))
-    plt.close()
-
 def run_single_config(env_name, config, seed, total_steps, output_dir):
     torch.manual_seed(seed)
     np.random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
   
     env = gym.make(env_name)
     env.reset(seed=seed)
@@ -163,6 +113,9 @@ def run_single_config(env_name, config, seed, total_steps, output_dir):
     noise_clip = 0.5
     tau = 0.005
     exploration_noise = 0.1
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
     
     actor = Actor(state_dim, action_dim, max_action)
     critic = Critic(state_dim, action_dim, use_two_q=config['use_twin_critics'])
@@ -177,11 +130,12 @@ def run_single_config(env_name, config, seed, total_steps, output_dir):
                         minibatch_size=minibatch_size,
                         min_replay_size_before_updates=min_replay_size_before_updates, 
                         tau=tau, 
-                        max_action=max_action, 
+                        max_action=max_action,
+                        device=device, 
                         use_two_q=config['use_twin_critics'])
     
     print(f"Training {config['name']} with seed {seed} on {env_name}")
-    episode_returns, episode_timesteps, q_values = agent_environment.agent_environment_step_loop(agent, env, total_steps, debug=False, track_q=True)
+    episode_returns, episode_timesteps, q_values = agent_environment.agent_environment_step_loop(agent, env, total_steps, debug=True, track_q=True)
     
     config_folder = os.path.join(output_dir, config['name'].replace(" ", "_").replace("(", "").replace(")", ""))
     os.makedirs(config_folder, exist_ok=True)
@@ -199,52 +153,6 @@ def run_single_config(env_name, config, seed, total_steps, output_dir):
         
     return config['name'], seed
 
-def create_plots(env_name, results_dir):    
-    # 1. Twin Critics vs Single Critic
-    plot_grouped_configs(
-        env_name, 
-        results_dir, 
-        "Twin Critics vs Single Critic", 
-        ["TD3 (Default)", "TD3 (Single Critic)"], 
-        "critics_comparison"
-    )
-    
-    # 2. Delayed Updates Comparison
-    plot_grouped_configs(
-        env_name, 
-        results_dir, 
-        "Policy Update Frequency", 
-        ["TD3 (Default)", "TD3 (No Delayed Updates)", "TD3 (More Delayed Updates)"], 
-        "policy_update_frequency"
-    )
-    
-    # 3. Policy Noise Comparison
-    plot_grouped_configs(
-        env_name, 
-        results_dir, 
-        "Policy Noise", 
-        ["TD3 (Default)", "TD3 (No policy noise)", "TD3 (More policy noise)"], 
-        "policy_noise"
-    )
-    
-    # 4. All configs combined
-    all_configs = [
-        "TD3 (Default)",
-        "TD3 (Single Critic)",
-        "TD3 (No Delayed Updates)",
-        "TD3 (More Delayed Updates)",
-        "TD3 (No policy noise)",
-        "TD3 (More policy noise)"
-    ]
-    
-    plot_grouped_configs(
-        env_name, 
-        results_dir, 
-        "All Configurations", 
-        all_configs, 
-        "all_configs"
-    )
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", type=str, required=True, help="Environment name")
@@ -261,16 +169,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
     args = parser.parse_args()
 
-    if args.plot_only:
-        print(f"Creating plots from results in {args.output_dir}")
-        create_plots(args.env, args.output_dir)
-    else:
-        config = {
-            "name": args.config_name,
-            "use_twin_critics": args.use_twin_critics == 1,
-            "policy_freq": args.policy_freq,
-            "policy_noise": args.policy_noise
-        }
-        
-        os.makedirs(args.output_dir, exist_ok=True)
-        run_single_config(args.env, config, args.seed, args.total_steps, args.output_dir)
+    config = {
+        "name": args.config_name,
+        "use_twin_critics": args.use_twin_critics == 1,
+        "policy_freq": args.policy_freq,
+        "policy_noise": args.policy_noise
+    }
+    
+    os.makedirs(args.output_dir, exist_ok=True)
+    run_single_config(args.env, config, args.seed, args.total_steps, args.output_dir)
