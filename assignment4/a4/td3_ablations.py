@@ -111,8 +111,8 @@ def run_single_config(env_name, config, seed, total_steps, output_dir):
     min_replay_size_before_updates = 25000
     minibatch_size = 256
     noise_clip = 0.5
-    tau = 0.005
-    exploration_noise = 0.1
+    tau = config['tau']
+    exploration_noise = config['exploration_noise']
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -121,7 +121,10 @@ def run_single_config(env_name, config, seed, total_steps, output_dir):
     critic = Critic(state_dim, action_dim, use_two_q=config['use_twin_critics'])
     actor_optimizer = torch.optim.Adam(actor.parameters(), lr=lr, eps=optimizer_eps)
     critic_optimizer = torch.optim.Adam(critic.parameters(), lr=lr, eps=optimizer_eps)
-    explorer = epsilon_greedy_explorers.GaussianNoiseExplorer(std_dev=exploration_noise*max_action, max_action=max_action)
+    if config['explorer_type'] == 'gaussian':
+        explorer = epsilon_greedy_explorers.GaussianNoiseExplorer(std_dev=exploration_noise*max_action, max_action=max_action)
+    elif config['explorer_type'] == 'ou':
+        explorer = epsilon_greedy_explorers.OrnsteinUhlenbeckExplorer(sigma=exploration_noise, max_action=max_action)
     buffer = replay_buffer.ReplayBuffer(buffer_size, discount=discount)
     agent = ModifiedTD3(actor, actor_optimizer, critic, critic_optimizer, buffer, explorer, discount, 
                         policy_noise=config["policy_noise"] * max_action, 
@@ -165,15 +168,19 @@ if __name__ == '__main__':
     parser.add_argument("--track-q", action="store_true", default=True, help="Track Q-values")
     parser.add_argument("--policy-freq", type=int, default=2, help="Policy update frequency")
     parser.add_argument("--policy-noise", type=float, default=0.2, help="Policy noise")
+    parser.add_argument("--tau", type=float, default=0.005, help="Target network update rate")
+    parser.add_argument("--explorer-type", type=str, default="gaussian", help="Explorer type")
+    parser.add_argument("--exploration-noise", type=float, default=0.1, help="Exploration noise")
     parser.add_argument("--plot-only", action="store_true", help="Only create plots from existing results")
     args = parser.parse_args()
-    args = parser.parse_args()
-
     config = {
         "name": args.config_name,
         "use_twin_critics": args.use_twin_critics == 1,
         "policy_freq": args.policy_freq,
-        "policy_noise": args.policy_noise
+        "policy_noise": args.policy_noise,
+        "tau": args.tau,
+        "explorer_type": args.explorer_type,
+        "exploration_noise": args.exploration_noise
     }
     
     os.makedirs(args.output_dir, exist_ok=True)

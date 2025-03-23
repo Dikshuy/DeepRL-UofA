@@ -9,21 +9,24 @@ ENVS=("Ant-v4" "Walker2d-v4")
 NUM_SEEDS=3
 TOTAL_STEPS=1000000
 
-# Format: "CONFIG_NAME USE_TWIN_CRITICS POLICY_FREQ POLICY_NOISE"
+# Format: "CONFIG_NAME USE_TWIN_CRITICS POLICY_FREQ POLICY_NOISE TAU EXPLORER_TYPE EXPLORER_NOISE"
 CONFIGS=(
-    "TD3_(Default) 1 2 0.2"
-    "TD3_(Single_Critic) 0 2 0.2"
-    "TD3_(No_Delayed_Updates) 1 1 0.2"
-    "TD3_(More_Delayed_Updates) 1 4 0.2"
-    "TD3_(No_policy_noise) 1 2 0.0"
-    "TD3_(More_policy_noise) 1 2 0.5"
+    "TD3_(Default) 1 2 0.2 0.005 gaussian 0.1"
+    "TD3_(Single_Critic) 0 2 0.2 0.005 gaussian 0.1"
+    "TD3_(No_Delayed_Updates) 1 1 0.2 0.005 gaussian 0.1"
+    "TD3_(More_Delayed_Updates) 1 4 0.2 0.005 gaussian 0.1"
+    "TD3_(No_policy_noise) 1 2 0.0 0.005 gaussian 0.1"
+    "TD3_(More_policy_noise) 1 2 0.5 0.005 gaussian 0.1"
+    "TD3_(Fast_Target_Update) 1 2 0.2 0.05 gaussian 0.1"
+    "TD3_(Slow_Target_Update) 1 2 0.2 0.001 gaussian 0.1"
+    "TD3_(Ornstein_Uhlenbeck) 1 2 0.2 0.005 ou 0.1"
 )
 
 for ENV in "${ENVS[@]}"; do
     mkdir -p "$OUTPUT_DIR/$ENV"
     
     for CONFIG in "${CONFIGS[@]}"; do
-        read -r CONFIG_NAME USE_TWIN_CRITICS POLICY_FREQ POLICY_NOISE <<< "$CONFIG"
+        read -r CONFIG_NAME USE_TWIN_CRITICS POLICY_FREQ POLICY_NOISE TAU EXPLORER_TYPE EXPLORER_NOISE<<< "$CONFIG"
         
         for SEED in $(seq 0 $((NUM_SEEDS-1))); do
             SANITIZED_CONFIG_NAME=$(echo "$CONFIG_NAME" | tr " " "_" | tr -d "()")
@@ -41,7 +44,7 @@ for ENV in "${ENVS[@]}"; do
 
 echo "Running TD3 Ablation Experiment..."
 echo "Environment: $ENV"
-echo "Configuration: $CONFIG_NAME (Use Twin Critics=$USE_TWIN_CRITICS, Policy Freq=$POLICY_FREQ, Policy Noise=$POLICY_NOISE)"
+echo "Configuration: $CONFIG_NAME"
 echo "Seed: $SEED"
 
 mkdir -p "$OUTPUT_DIR/$ENV"
@@ -54,7 +57,10 @@ python td3_ablations.py \\
     --output-dir "$OUTPUT_DIR/$ENV" \\
     --use-twin-critics $USE_TWIN_CRITICS \\
     --policy-freq $POLICY_FREQ \\
-    --policy-noise $POLICY_NOISE
+    --policy-noise $POLICY_NOISE \\
+    --tau $TAU \\
+    --explorer-type $EXPLORER_TYPE \\
+    --explorer-noise $EXPLORER_NOISE
 
 echo "TD3 Ablation Experiment Completed"
 echo "========================================================================================="
