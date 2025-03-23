@@ -81,3 +81,32 @@ class GaussianNoiseExplorer:
         noisy_action = action_values + noise
         return np.clip(noisy_action, -self.max_action, self.max_action)
     
+class OrnsteinUhlenbeckExplorer:
+    """Ornstein-Uhlenbeck process for temporally correlated exploration.
+    
+    Args:
+        mean: Mean of the process
+        theta: Rate of mean reversion
+        sigma: Standard deviation of the process
+        max_action: Maximum absolute value of action
+    """
+    def __init__(self, mean=0.0, theta=0.15, sigma=0.2, max_action=1.0):
+        self.mean = mean
+        self.theta = theta
+        self.sigma = sigma
+        self.max_action = max_action
+        self.state = None
+        
+    def reset(self):
+        self.state = None
+        
+    def select_action(self, action):
+        if self.state is None:
+            self.state = np.zeros_like(action)
+            
+        x = self.state
+        dx = self.theta * (self.mean - x) + self.sigma * np.random.randn(*x.shape)
+        self.state = x + dx
+        
+        return np.clip(action + self.state, -self.max_action, self.max_action)
+    
