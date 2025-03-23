@@ -112,7 +112,7 @@ def run_single_config(env_name, config, seed, total_steps, output_dir):
     minibatch_size = 256
     noise_clip = 0.5
     tau = config['tau']
-    exploration_noise = config['exploration_noise']
+    exploration_noise = config['explorer_noise']
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -138,7 +138,7 @@ def run_single_config(env_name, config, seed, total_steps, output_dir):
                         use_two_q=config['use_twin_critics'])
     
     print(f"Training {config['name']} with seed {seed} on {env_name}")
-    episode_returns, episode_timesteps, q_values = agent_environment.agent_environment_step_loop(agent, env, total_steps, debug=True, track_q=True)
+    episode_returns, episode_timesteps, q_values = agent_environment.agent_environment_step_loop(agent, env, total_steps, debug=True, track_q=False)
     
     config_folder = os.path.join(output_dir, config['name'].replace(" ", "_").replace("(", "").replace(")", ""))
     os.makedirs(config_folder, exist_ok=True)
@@ -170,7 +170,7 @@ if __name__ == '__main__':
     parser.add_argument("--policy-noise", type=float, default=0.2, help="Policy noise")
     parser.add_argument("--tau", type=float, default=0.005, help="Target network update rate")
     parser.add_argument("--explorer-type", type=str, default="gaussian", help="Explorer type")
-    parser.add_argument("--exploration-noise", type=float, default=0.1, help="Exploration noise")
+    parser.add_argument("--explorer-noise", type=float, default=0.1, help="Exploration noise")
     parser.add_argument("--plot-only", action="store_true", help="Only create plots from existing results")
     args = parser.parse_args()
     config = {
@@ -180,7 +180,7 @@ if __name__ == '__main__':
         "policy_noise": args.policy_noise,
         "tau": args.tau,
         "explorer_type": args.explorer_type,
-        "exploration_noise": args.exploration_noise
+        "explorer_noise": args.explorer_noise
     }
     
     os.makedirs(args.output_dir, exist_ok=True)
