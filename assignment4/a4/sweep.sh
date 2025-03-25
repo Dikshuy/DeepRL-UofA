@@ -6,7 +6,7 @@ OUTPUT_DIR="results"
 mkdir -p $OUTPUT_DIR
 
 ENVS=("Ant-v4" "Walker2d-v4")
-NUM_SEEDS=3
+NUM_SEEDS=5
 TOTAL_STEPS=1000000
 
 # Format: "CONFIG_NAME USE_TWIN_CRITICS POLICY_FREQ POLICY_NOISE TAU EXPLORER_TYPE EXPLORER_NOISE"
@@ -37,7 +37,7 @@ for ENV in "${ENVS[@]}"; do
 #!/bin/bash
 #SBATCH --account=def-mtaylor3_cpu
 #SBATCH --mem-per-cpu=8G
-#SBATCH --time=44:00:00
+#SBATCH --time=20:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --gres=gpu:1
