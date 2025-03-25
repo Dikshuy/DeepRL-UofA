@@ -35,10 +35,12 @@ def agent_environment_episode_loop(agent, env, num_episodes, debug=False, track_
     else:
         return episode_returns, None
 
-def agent_environment_step_loop(agent, env, num_steps, debug=False, track_q=False):
+def agent_environment_step_loop(agent, env, num_steps, eval_frequency=1000, num_eval_episodes=3, debug=False, track_q=False):
     observation, info = env.reset()
     episode_returns = []
     episodes_timesteps = []
+    evaluation_returns = []
+    evaluation_timesteps = []
     current_timestep = 0
     episode_return = 0
     episode_loss = 0
@@ -63,8 +65,26 @@ def agent_environment_step_loop(agent, env, num_steps, debug=False, track_q=Fals
             episode_return = 0
             episode_loss = 0
             observation, info = env.reset()
-        # end your code
-    if track_q:   
-        return episode_returns, episodes_timesteps, mean_q_predictions
+
+        if step > 0 and step % eval_frequency == 0:
+            eval_returns = []
+            for _ in range(num_eval_episodes):
+                eval_obs, eval_info = env.reset()
+                eval_episode_return = 0
+                eval_done = False
+                
+                while not eval_done:
+                    eval_action, _ = agent.act(eval_obs)
+                    eval_obs, eval_reward, terminated, truncated, eval_info = env.step(eval_action)
+                    eval_episode_return += eval_reward
+                    eval_done = terminated or truncated
+                
+                eval_returns.append(eval_episode_return)
+            evaluation_returns.append(np.mean(eval_returns))
+            evaluation_timesteps.append(step)
+            if debug:
+                print(f"Step: {current_timestep} - Evaluation Return: {evaluation_returns[-1]}")
+    if track_q:
+        return evaluation_returns, evaluation_timesteps, mean_q_predictions, 
     else:
-        return episode_returns, episodes_timesteps, None
+        return evaluation_returns, evaluation_timesteps, None
