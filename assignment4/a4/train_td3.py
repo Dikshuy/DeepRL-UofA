@@ -97,30 +97,28 @@ def plot_alg_results(episode_returns_list, file, label="Algorithm", ylabel="Retu
     # Display the plot
     plt.savefig(file)
 
-# Adapted from Claude
-def plot_timestep_returns(returns_list, timesteps_list, file, env_name, title="Learning Curve"):
+def plot_timestep_returns(eval_returns_list, eval_timesteps_list, file, env_name, title="Learning Curve", window_size=100):
     plt.figure(figsize=(10, 6))
     
-    # Determine the maximum number of timesteps
-    max_timesteps = max([ts[-1] for ts in timesteps_list])
-
-    # Create a common x-axis for interpolation
-    common_x = np.linspace(0, max_timesteps, 100)
-    interpolated_returns = []
-    for i, (returns, timesteps) in enumerate(zip(returns_list, timesteps_list)):
-        # Use numpy interpolation to get values at common timesteps
-        interpolated_y = np.interp(common_x, timesteps, returns)
-        interpolated_returns.append(interpolated_y)
-        
-        plt.plot(timesteps, returns, alpha=0.3, color='r', linestyle='-')
-
-    # Calculate and plot the mean performance
-    mean_returns = np.mean(interpolated_returns, axis=0)
-    plt.plot(common_x, mean_returns, color='r', linewidth=2, label='Mean Return')
+    smoothed_eval_returns_list = []
+    for eval_returns in eval_returns_list:
+        smoothed_returns = []
+        for i in range(len(eval_returns)):
+            start = max(0, i - window_size // 2)
+            end = min(len(eval_returns), i + window_size // 2 + 1)
+            window_mean = np.mean(eval_returns[start:end])
+            smoothed_returns.append(window_mean)
+        smoothed_eval_returns_list.append(smoothed_returns)
+    
+    for i, (eval_returns, eval_timesteps) in enumerate(zip(smoothed_eval_returns_list, eval_timesteps_list)):
+        plt.plot(eval_timesteps, eval_returns, alpha=0.3, color='r', linestyle='-')
+    
+    mean_smoothed_eval_returns = np.mean(smoothed_eval_returns_list, axis=0)
+    plt.plot(eval_timesteps_list[0], mean_smoothed_eval_returns, color='r', linewidth=2, label='Mean Evaluation Return')
     
     plt.title(f"({CCID}) {title}")
     plt.xlabel("Time Steps")
-    plt.ylabel("Average Return")
+    plt.ylabel("Evaluation Return")
     plt.legend()
     plt.grid(True)
     plt.savefig(file)
@@ -155,9 +153,9 @@ if __name__ == '__main__':
     environments = [
         "Ant-v4",
         "Walker2d-v4",
-        "MountainCarContinuous-v0",
-        "Reacher-v4",
-        "InvertedPendulum-v4"
+        # "MountainCarContinuous-v0",
+        # "Reacher-v4",
+        # "InvertedPendulum-v4"
     ]
 
     for env_name in environments:
@@ -167,9 +165,9 @@ if __name__ == '__main__':
         action_dim = env.action_space.shape[0]
         max_action = float(env.action_space.high[0])
 
-        all_returns = []
-        all_timesteps = []
         all_q_values = []
+        all_eval_returns = []
+        all_eval_timesteps = []
 
         for seed in range(num_seeds):
             print(f"running seed: {seed}")
@@ -188,13 +186,10 @@ if __name__ == '__main__':
             agent = td3.TD3(actor, actor_optimizer, critic, critic_optimizer, buffer, explorer, discount, policy_noise=policy_noise*max_action, 
                             noise_clip=noise_clip*max_action, policy_update_frequency=policy_freq, minibatch_size=minibatch_size,
                             min_replay_size_before_updates=min_replay_size_before_updates, tau=tau, max_action=max_action, device=device)
-            episode_returns, episode_timesteps, q_values = agent_environment.agent_environment_step_loop(agent, env, total_steps, args.debug, args.track_q)
-            all_returns.append(episode_returns)
-            all_timesteps.append(episode_timesteps)
+            eval_returns, eval_timesteps, q_values = agent_environment.agent_environment_step_loop(agent, env, total_steps, debug=args.debug, track_q=args.track_q)
+
             all_q_values.append(q_values)
+            all_eval_returns.append(eval_returns)
+            all_eval_timesteps.append(eval_timesteps)
 
-        timesteps_list = []
-        for timesteps in all_timesteps:
-            timesteps_list.append(np.array(timesteps))
-
-        plot_timestep_returns(all_returns, timesteps_list,f"td3_{env_name.lower().replace('-', '_')}.png", env_name, title=f"TD3 Performance on {env_name}")
+        plot_timestep_returns(all_eval_returns, all_eval_timesteps, f"td3_{env_name.lower().replace('-', '_')}.png", env_name, title=f"TD3 Performance on {env_name}")
