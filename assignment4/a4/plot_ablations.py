@@ -59,9 +59,14 @@ def plot_timestep_returns(results, configs, file, env_name, title="Learning Curv
         
         for returns, timesteps in zip(returns_list, timesteps_list):
             plt.plot(timesteps, returns, alpha=0.2, color=colors[i], linestyle='-')
+
+        if config == 'TD3_(Default)' and title == 'Default Configuration':
+            config = 'Mean Evaluation Return'
         
         plt.plot(common_x, mean_returns, color=colors[i], linewidth=2, label=config)
     
+    if title == "Default Configuration":
+        title = "TD3 performance on"
     plt.title(f"({CCID}) {title} - {env_name}")
     plt.xlabel("Time Steps")
     plt.ylabel("Average Return")
@@ -75,6 +80,10 @@ def generate_ablation_plots(base_results_dir, output_dir):
     envs = ['Ant-v4', 'Walker2d-v4']
     
     plot_configs = [
+        {
+            'name': 'Default Configuration',
+            'configs': ['TD3_(Default)']
+        },
         {
             'name': 'Critic Architecture Comparison',
             'configs': ['TD3_(Default)', 'TD3_(Single_Critic)']
