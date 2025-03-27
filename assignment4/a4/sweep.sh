@@ -2,7 +2,7 @@
 
 SCRIPT_DIR="./generated_scripts"
 mkdir -p $SCRIPT_DIR
-OUTPUT_DIR="results"
+OUTPUT_DIR="results2"
 mkdir -p $OUTPUT_DIR
 
 ENVS=("Ant-v4" "Walker2d-v4")
