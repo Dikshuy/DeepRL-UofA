@@ -184,7 +184,7 @@ if __name__ == '__main__':
             agent = td3.TD3(actor, actor_optimizer, critic, critic_optimizer, buffer, explorer, discount, policy_noise=policy_noise*max_action, 
                             noise_clip=noise_clip*max_action, policy_update_frequency=policy_freq, minibatch_size=minibatch_size,
                             min_replay_size_before_updates=min_replay_size_before_updates, tau=tau, max_action=max_action, device=device)
-            eval_returns, eval_timesteps = agent_environment.agent_environment_step_loop(agent, env, total_steps, debug=args.debug)
+            eval_returns, eval_timesteps, _ = agent_environment.agent_environment_step_loop(agent, env, total_steps, min_replay_size_before_updates, debug=args.debug)
 
             all_eval_returns.append(eval_returns)
             all_eval_timesteps.append(eval_timesteps)

@@ -95,6 +95,7 @@ class TD3:
         current_q1, current_q2 = self.critic(batched_states, batched_actions)
         current_q1 = current_q1.squeeze(-1)
         current_q2 = current_q2.squeeze(-1)
+        q_values = torch.min(current_q1, current_q2)
 
         critic_loss = F.mse_loss(current_q1, targets) + F.mse_loss(current_q2, targets)
 
@@ -112,7 +113,7 @@ class TD3:
             soft_update(self.actor, self.actor_target, self.tau)
             soft_update(self.critic, self.critic_target, self.tau)
 
-        return critic_loss.item()
+        return q_values.abs().mean().item()
 
     def process_transition(self, obs: int, reward: float, terminated: bool, truncated: bool) -> None:
         """Observe consequences of the last action and update estimates accordingly.
@@ -127,16 +128,10 @@ class TD3:
             processed_obs = self.input_preprocessor(obs)
             self.replay_buffer.append(cpu_last_obs, self.last_action, reward, processed_obs, int(terminated), int(truncated))
             self.total_steps += 1
+
             if self.total_steps >= self.min_replay_size_before_updates:
-                loss = self.gradient_update()
-                self.episode_loss += loss
-            
-            if terminated or truncated:
-                episode_loss = self.episode_loss
-                self.episode_loss = 0
-                return episode_loss
-            else:
-                return 0
+                q_val = self.gradient_update()
+                return q_val
             
 def soft_update(source, target, tau):
     for param, target_param in zip(source.parameters(), target.parameters()):

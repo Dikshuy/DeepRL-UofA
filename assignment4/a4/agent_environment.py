@@ -35,21 +35,22 @@ def agent_environment_episode_loop(agent, env, num_episodes, debug=False, track_
     else:
         return episode_returns, None
 
-def agent_environment_step_loop(agent, env, num_steps, eval_frequency=5000, num_eval_episodes=10, debug=False):
+def agent_environment_step_loop(agent, env, num_steps, min_replay_size, eval_frequency=5000, num_eval_episodes=10, debug=False):
     observation, info = env.reset()
     episode_returns = []
     episodes_timesteps = []
+    q_values = []
     evaluation_returns = []
     evaluation_timesteps = []
     current_timestep = 0
     episode_return = 0
-    episode_loss = 0
     for step in range(num_steps):
         # start your code
         action = agent.act(observation)
         next_observation, reward, terminated, truncated, info = env.step(action)
-        loss = agent.process_transition(next_observation, reward, terminated, truncated)
-        episode_loss += loss
+        q_vals = agent.process_transition(next_observation, reward, terminated, truncated)
+        if step > min_replay_size:
+            q_values.append(q_vals)
         observation = next_observation
         episode_return += reward
         current_timestep = step + 1
@@ -60,7 +61,6 @@ def agent_environment_step_loop(agent, env, num_steps, eval_frequency=5000, num_
             if debug:
                 print(f"Step: {current_timestep} - Return: {episode_return}")
             episode_return = 0
-            episode_loss = 0
             observation, info = env.reset()
 
         if step > 0 and step % eval_frequency == 0:
@@ -81,4 +81,4 @@ def agent_environment_step_loop(agent, env, num_steps, eval_frequency=5000, num_
             evaluation_timesteps.append(step)
             if debug:
                 print(f"Step: {current_timestep} - Evaluation Return: {evaluation_returns[-1]}")
-    return evaluation_returns, evaluation_timesteps
+    return evaluation_returns, evaluation_timesteps, q_values
