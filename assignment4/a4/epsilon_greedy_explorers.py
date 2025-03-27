@@ -71,14 +71,13 @@ class GaussianNoiseExplorer:
         std_dev: Standard deviation of the Gaussian noise
         max_action: Maximum absolute value of action
     """
-    def __init__(self, std_dev, max_action, determinstic=False):
+    def __init__(self, std_dev, max_action):
         self.std_dev = std_dev
         self.max_action = max_action
-        self.determinstic = determinstic
     
-    def select_action(self, action_values):
+    def select_action(self, action_values, deterministic=False):
         """Adds Gaussian noise to the action values"""
-        if self.determinstic:
+        if deterministic:
             self.std_dev = 0.0
         noise = np.random.normal(0, self.std_dev, size=action_values.shape)
         noisy_action = action_values + noise
@@ -93,22 +92,21 @@ class OrnsteinUhlenbeckExplorer:
         sigma: Standard deviation of the process
         max_action: Maximum absolute value of action
     """
-    def __init__(self, mean=0.0, theta=0.15, sigma=0.2, max_action=1.0, determinstic=False):
+    def __init__(self, mean=0.0, theta=0.15, sigma=0.2, max_action=1.0):
         self.mean = mean
         self.theta = theta
         self.sigma = sigma
         self.max_action = max_action
         self.state = None
-        self.determinstic = determinstic
         
     def reset(self):
         self.state = None
         
-    def select_action(self, action):
+    def select_action(self, action, deterministic=False):
         if self.state is None:
             self.state = np.zeros_like(action)
 
-        if self.determinstic:
+        if deterministic:
             self.sigma = 0.0
             self.theta = 0.0
             

@@ -138,7 +138,7 @@ def run_single_config(env_name, config, seed, total_steps, output_dir):
                         use_two_q=config['use_twin_critics'])
     
     print(f"Training {config['name']} with seed {seed} on {env_name}")
-    eval_returns, eval_timesteps, q_values = agent_environment.agent_environment_step_loop(agent, env, total_steps, debug=True, track_q=True)
+    eval_returns, eval_timesteps = agent_environment.agent_environment_step_loop(agent, env, total_steps, debug=True)
     
     config_folder = os.path.join(output_dir, config['name'].replace(" ", "_").replace("(", "").replace(")", ""))
     os.makedirs(config_folder, exist_ok=True)
@@ -146,7 +146,6 @@ def run_single_config(env_name, config, seed, total_steps, output_dir):
     result = {
         "returns": eval_returns,
         "timesteps": eval_timesteps,
-        "q_values": q_values,
         "config": config,
         "seed": seed
     }

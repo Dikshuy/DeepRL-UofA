@@ -128,7 +128,6 @@ def plot_timestep_returns(eval_returns_list, eval_timesteps_list, file, env_name
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true", default=False)
-    parser.add_argument("--track-q", action="store_true", default=False)
     parser.add_argument("--num-runs", type=int, default=5)
     parser.add_argument("--total-steps", type=int, default=1000000)
     args = parser.parse_args()
@@ -165,7 +164,6 @@ if __name__ == '__main__':
         action_dim = env.action_space.shape[0]
         max_action = float(env.action_space.high[0])
 
-        all_q_values = []
         all_eval_returns = []
         all_eval_timesteps = []
 
@@ -186,9 +184,8 @@ if __name__ == '__main__':
             agent = td3.TD3(actor, actor_optimizer, critic, critic_optimizer, buffer, explorer, discount, policy_noise=policy_noise*max_action, 
                             noise_clip=noise_clip*max_action, policy_update_frequency=policy_freq, minibatch_size=minibatch_size,
                             min_replay_size_before_updates=min_replay_size_before_updates, tau=tau, max_action=max_action, device=device)
-            eval_returns, eval_timesteps, q_values = agent_environment.agent_environment_step_loop(agent, env, total_steps, debug=args.debug, track_q=args.track_q)
+            eval_returns, eval_timesteps = agent_environment.agent_environment_step_loop(agent, env, total_steps, debug=args.debug)
 
-            all_q_values.append(q_values)
             all_eval_returns.append(eval_returns)
             all_eval_timesteps.append(eval_timesteps)
 

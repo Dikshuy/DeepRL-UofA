@@ -35,7 +35,7 @@ def agent_environment_episode_loop(agent, env, num_episodes, debug=False, track_
     else:
         return episode_returns, None
 
-def agent_environment_step_loop(agent, env, num_steps, eval_frequency=5000, num_eval_episodes=5, debug=False, track_q=False):
+def agent_environment_step_loop(agent, env, num_steps, eval_frequency=5000, num_eval_episodes=10, debug=False):
     observation, info = env.reset()
     episode_returns = []
     episodes_timesteps = []
@@ -44,10 +44,9 @@ def agent_environment_step_loop(agent, env, num_steps, eval_frequency=5000, num_
     current_timestep = 0
     episode_return = 0
     episode_loss = 0
-    mean_q_predictions = [] # the average Q-value for all state-action pairs visited in the episode
     for step in range(num_steps):
         # start your code
-        action, q_values = agent.act(observation)
+        action = agent.act(observation)
         next_observation, reward, terminated, truncated, info = env.step(action)
         loss = agent.process_transition(next_observation, reward, terminated, truncated)
         episode_loss += loss
@@ -55,8 +54,6 @@ def agent_environment_step_loop(agent, env, num_steps, eval_frequency=5000, num_
         episode_return += reward
         current_timestep = step + 1
         done = terminated or truncated
-        if track_q:
-            mean_q_predictions.append(q_values)
         if done:
             episode_returns.append(episode_return)
             episodes_timesteps.append(current_timestep)
@@ -74,8 +71,8 @@ def agent_environment_step_loop(agent, env, num_steps, eval_frequency=5000, num_
                 eval_done = False
                 
                 while not eval_done:
-                    eval_action, _ = agent.act(eval_obs)
-                    eval_obs, eval_reward, terminated, truncated, eval_info = env.step(eval_action, deterministic=True)
+                    eval_action = agent.act(eval_obs, deterministic=True)
+                    eval_obs, eval_reward, terminated, truncated, eval_info = env.step(eval_action)
                     eval_episode_return += eval_reward
                     eval_done = terminated or truncated
                 
@@ -84,7 +81,4 @@ def agent_environment_step_loop(agent, env, num_steps, eval_frequency=5000, num_
             evaluation_timesteps.append(step)
             if debug:
                 print(f"Step: {current_timestep} - Evaluation Return: {evaluation_returns[-1]}")
-    if track_q:
-        return evaluation_returns, evaluation_timesteps, mean_q_predictions, 
-    else:
-        return evaluation_returns, evaluation_timesteps, None
+    return evaluation_returns, evaluation_timesteps

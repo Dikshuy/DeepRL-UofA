@@ -63,12 +63,11 @@ class TD3:
         obs = torch.tensor(obs, dtype=torch.float32).to(self.device)
         with torch.no_grad():
             action_vals = self.actor(obs).cpu().detach().numpy()
-            action = self.explorer.select_action(action_vals, deterministic=deterministic)
+            action = self.explorer.select_action(action_vals, deterministic)
             action = np.clip(action, -self.max_action, self.max_action)
-            q_value = self.critic.Q1(obs.unsqueeze(0), torch.tensor(action, dtype=torch.float32).unsqueeze(0).to(self.device)).cpu().item()
         self.last_obs = obs
         self.last_action = action
-        return action, q_value
+        return action
 
     def compute_targets(self, batched_rewards, batched_actions, batched_next_states, batched_discounts, batch_terminated):
         with torch.no_grad():
