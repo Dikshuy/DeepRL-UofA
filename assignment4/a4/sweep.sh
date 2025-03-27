@@ -19,6 +19,7 @@ CONFIGS=(
     "TD3_(More_policy_noise) 1 2 0.5 0.005 gaussian 0.1"
     "TD3_(Fast_Target_Update) 1 2 0.2 0.05 gaussian 0.1"
     "TD3_(Slow_Target_Update) 1 2 0.2 0.001 gaussian 0.1"
+    "TD3_(No_Target_Network) 1 2 0.2 1 gaussian 0.1"
     "TD3_(Ornstein_Uhlenbeck) 1 2 0.2 0.005 ou 0.1"
 )
 
