@@ -35,7 +35,7 @@ def agent_environment_episode_loop(agent, env, num_episodes, debug=False, track_
     else:
         return episode_returns, None
 
-def agent_environment_step_loop(agent, env, num_steps, eval_frequency=1000, num_eval_episodes=3, debug=False, track_q=False):
+def agent_environment_step_loop(agent, env, num_steps, eval_frequency=5000, num_eval_episodes=5, debug=False, track_q=False):
     observation, info = env.reset()
     episode_returns = []
     episodes_timesteps = []
@@ -75,7 +75,7 @@ def agent_environment_step_loop(agent, env, num_steps, eval_frequency=1000, num_
                 
                 while not eval_done:
                     eval_action, _ = agent.act(eval_obs)
-                    eval_obs, eval_reward, terminated, truncated, eval_info = env.step(eval_action)
+                    eval_obs, eval_reward, terminated, truncated, eval_info = env.step(eval_action, deterministic=True)
                     eval_episode_return += eval_reward
                     eval_done = terminated or truncated
                 
