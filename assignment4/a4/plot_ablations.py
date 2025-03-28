@@ -62,6 +62,42 @@ def plot_timestep_returns(results, configs, file, env_name, title="Learning Curv
 
         if config == 'TD3_(Default)' and title == 'Default Configuration':
             config = 'Mean Evaluation Return'
+
+        if title == 'Critic Architecture Comparison':
+            if config == 'TD3_(Single_Critic)':
+                config = 'Single Critic'
+            if config == 'TD3_(Default)':
+                config = 'Twin Critics'
+
+        if title == 'Policy Update Frequency Comparison':
+            if config == 'TD3_(Default)':
+                config = 'd = 2'
+            if config == 'TD3_(No_Delayed_Updates)':
+                config = 'd = 1'
+            if config == 'TD3_(More_Delayed_Updates)':
+                config = 'd = 4'
+
+        if title == 'Policy Noise Comparison':
+            if config == 'TD3_(Default)':
+                config = 'c = 0.2'
+            if config == 'TD3_(No_policy_noise)':
+                config = 'c = 0.0'
+            if config == 'TD3_(More_policy_noise)':
+                config = 'c = 0.5' 
+        
+        if title == 'Target Network Update Rate Comparison':
+            if config == 'TD3_(Slow_Target_Update)':
+                config = r'$\tau$=0.001'
+            if config == 'TD3_(Fast_Target_Update)':
+                config = r'$\tau$ = 0.05'
+            if config == 'TD3_(Default)':
+                config = r'$\tau$ = 0.005'
+
+        if title == 'Exploration Strategy Comparison':
+            if config == 'TD3_(Ornstein_Uhlenbeck)':
+                config = 'Ornstein Uhlenbeck Exploration'
+            if config == 'TD3_(Default)':
+                config = 'Gaussian Exploration'
         
         plt.plot(common_x, mean_returns, color=colors[i], linewidth=2, label=config)
     
@@ -90,15 +126,15 @@ def generate_ablation_plots(base_results_dir, output_dir):
         },
         {
             'name': 'Policy Update Frequency Comparison',
-            'configs': ['TD3_(No_Delayed_Updates)', 'TD3_(Default)', 'TD3_(More_Delayed_Updates)']
+            'configs': ['TD3_(Default)', 'TD3_(No_Delayed_Updates)', 'TD3_(More_Delayed_Updates)']
         },
         {
             'name': 'Policy Noise Comparison',
-            'configs': ['TD3_(No_policy_noise)', 'TD3_(Default)', 'TD3_(More_policy_noise)']
+            'configs': ['TD3_(Default)', 'TD3_(No_policy_noise)', 'TD3_(More_policy_noise)']
         },
         {
             'name': 'Target Network Update Rate Comparison',
-            'configs': ['TD3_(Slow_Target_Update)', 'TD3_(Default)', 'TD3_(Fast_Target_Update)']
+            'configs': ['TD3_(Default)', 'TD3_(Slow_Target_Update)', 'TD3_(Fast_Target_Update)']
         },
         {
             'name': 'Exploration Strategy Comparison',
