@@ -71,7 +71,7 @@ def agent_environment_step_loop(agent, env, num_steps, min_replay_size, eval_fre
                 eval_done = False
                 
                 while not eval_done:
-                    eval_action = agent.act(eval_obs, deterministic=True)
+                    eval_action = agent.act(eval_obs)
                     eval_obs, eval_reward, terminated, truncated, eval_info = env.step(eval_action)
                     eval_episode_return += eval_reward
                     eval_done = terminated or truncated

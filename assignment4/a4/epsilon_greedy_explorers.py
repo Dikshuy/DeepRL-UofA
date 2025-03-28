@@ -75,10 +75,8 @@ class GaussianNoiseExplorer:
         self.std_dev = std_dev
         self.max_action = max_action
     
-    def select_action(self, action_values, deterministic=False):
+    def select_action(self, action_values):
         """Adds Gaussian noise to the action values"""
-        if deterministic:
-            self.std_dev = 0.0
         noise = np.random.normal(0, self.std_dev, size=action_values.shape)
         noisy_action = action_values + noise
         return np.clip(noisy_action, -self.max_action, self.max_action)
@@ -102,13 +100,9 @@ class OrnsteinUhlenbeckExplorer:
     def reset(self):
         self.state = None
         
-    def select_action(self, action, deterministic=False):
+    def select_action(self, action):
         if self.state is None:
             self.state = np.zeros_like(action)
-
-        if deterministic:
-            self.sigma = 0.0
-            self.theta = 0.0
             
         x = self.state
         dx = self.theta * (self.mean - x) + self.sigma * np.random.randn(*x.shape)

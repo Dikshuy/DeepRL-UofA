@@ -56,14 +56,14 @@ class TD3:
         self.last_action = None
         self.episode_loss = 0
 
-    def act(self, obs, deterministic=False) -> int:
+    def act(self, obs) -> int:
         """Returns an action and its q-value 
         """
         obs = self.input_preprocessor(obs)
         obs = torch.tensor(obs, dtype=torch.float32).to(self.device)
         with torch.no_grad():
             action_vals = self.actor(obs).cpu().detach().numpy()
-            action = self.explorer.select_action(action_vals, deterministic)
+            action = self.explorer.select_action(action_vals)
             action = np.clip(action, -self.max_action, self.max_action)
         self.last_obs = obs
         self.last_action = action
